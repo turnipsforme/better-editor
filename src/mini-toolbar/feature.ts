@@ -3,7 +3,6 @@ import { EditorView } from "@codemirror/view";
 import type { App, MarkdownPostProcessorContext } from "obsidian";
 import {
   createColorExtension,
-  type ColorRange,
   type ColorStorage,
   type FileColorData,
   type Range,
@@ -240,14 +239,14 @@ export class MiniToolbarFeature {
 
         const slice = text.slice(segmentStart - start, segmentEnd - start);
         if (!slice) continue;
-        const textColor = (textCursor.rangeAt(segmentStart) as ColorRange | null)?.color ?? null;
-        const backgroundColor = (backgroundCursor.rangeAt(segmentStart) as ColorRange | null)?.color ?? null;
+        const textColor = textCursor.rangeAt(segmentStart)?.color ?? null;
+        const backgroundColor = backgroundCursor.rangeAt(segmentStart)?.color ?? null;
         const underline = !!underlineCursor.rangeAt(segmentStart);
 
         if (!textColor && !backgroundColor && !underline) {
           fragments.push(doc.createTextNode(slice));
         } else {
-          const span = doc.createElement("span");
+          const span = doc.createDocumentFragment().createEl("span");
           span.setCssStyles({
             color: textColor ?? "",
             backgroundColor: backgroundColor ?? "",

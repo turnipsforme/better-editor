@@ -41,6 +41,16 @@ interface AppWithInternalPlugins extends App {
   };
 }
 
+interface ParsedDate {
+  isValid(): boolean;
+}
+
+const parseDateStrictly = moment as unknown as (
+  input: string,
+  format: string,
+  strict: boolean,
+) => ParsedDate;
+
 export default class BetterEditorPlugin extends Plugin implements SettingsHost {
   settings: BetterEditorSettings = { ...DEFAULT_SETTINGS };
 
@@ -300,6 +310,6 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
         : ""
       : pathWithoutExtension;
 
-    return relativePath.length > 0 && moment(relativePath, format, true).isValid();
+    return relativePath.length > 0 && parseDateStrictly(relativePath, format, true).isValid();
   }
 }

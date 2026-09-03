@@ -294,7 +294,7 @@ class SmallButton extends BaseComponent {
       const colorHex =
         name === "Default"
           ? "var(--text-normal)"
-          : NOTION_TEXT_COLOR_MAP[name as keyof typeof NOTION_TEXT_COLOR_MAP];
+          : NOTION_TEXT_COLOR_MAP[name];
       this.menu.addItem((item) => {
         item.setTitle("A").onClick(() => {
           this.onSelectOption?.(name);
@@ -304,9 +304,7 @@ class SmallButton extends BaseComponent {
         itemEl?.setAttr("title", tooltip);
         itemEl?.setAttr("data-color-kind", "text");
         itemEl?.addClass("better-editor-mini-toolbar-color-item");
-        const titleEl = itemEl?.querySelector(
-          ".menu-item-title",
-        ) as HTMLElement | undefined;
+        const titleEl = itemEl?.querySelector<HTMLElement>(".menu-item-title");
         if (titleEl) {
           titleEl.setCssStyles({ color: colorHex });
         }
@@ -329,9 +327,7 @@ class SmallButton extends BaseComponent {
         itemEl?.setAttr("title", tooltip);
         itemEl?.setAttr("data-color-kind", "background");
         itemEl?.addClass("better-editor-mini-toolbar-color-item");
-        const titleEl = itemEl?.querySelector(
-          ".menu-item-title",
-        ) as HTMLElement | undefined;
+        const titleEl = itemEl?.querySelector<HTMLElement>(".menu-item-title");
         if (titleEl) {
           titleEl.setCssStyles({
             backgroundColor: colorValue,
@@ -348,8 +344,8 @@ class SmallButton extends BaseComponent {
       const menuEl = this.menu ? getComponentDom(this.menu) : undefined;
       if (!menuEl) return;
       const scrollerEl =
-        (menuEl.querySelector(".menu-scroller") as HTMLElement | null) ||
-        (menuEl.querySelector(".menu-scroll") as HTMLElement | null) ||
+        menuEl.querySelector<HTMLElement>(".menu-scroller") ||
+        menuEl.querySelector<HTMLElement>(".menu-scroll") ||
         menuEl;
 
       // Try to split items into two groups (text/background)

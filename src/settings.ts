@@ -288,9 +288,7 @@ export class BetterEditorSettingTab extends PluginSettingTab {
   }
 
   async setControlValue(key: string, value: unknown): Promise<void> {
-    await this.plugin.updateSettings({
-      [key]: value,
-    } as Partial<BetterEditorSettings>);
+    await this.plugin.updateSettings({ [key]: value });
     this.update();
   }
 }
