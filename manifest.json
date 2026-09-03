@@ -1,0 +1,10 @@
+{
+  "id": "better-editor",
+  "name": "Better Editor",
+  "version": "1.0.0",
+  "minAppVersion": "1.13.1",
+  "description": "Focused editing tools for organizing notes, selecting text, editing tasks, managing tabs, and safely deleting linked files.",
+  "author": "Wren",
+  "authorUrl": "https://github.com/turnipsforme",
+  "isDesktopOnly": false
+}

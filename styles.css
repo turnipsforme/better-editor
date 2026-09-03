@@ -1,0 +1,40 @@
+/* Let the editor use the space normally occupied by a hidden tab bar. */
+.better-editor-hide-tabs .mod-root .workspace-tabs {
+  position: relative;
+}
+
+.better-editor-hide-tabs .mod-root .workspace-tabs .workspace-tab-header-container {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  visibility: hidden;
+  background: transparent;
+  -webkit-app-region: no-drag;
+}
+
+.better-editor-hide-tabs .mod-root .workspace-tabs .workspace-tab-header-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  visibility: visible;
+  pointer-events: auto;
+  -webkit-app-region: drag;
+}
+
+.better-editor-hide-tabs::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--better-editor-tab-gradient-height);
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(to bottom, var(--background-primary), transparent);
+}
+
+.better-editor-hide-tabs .mod-top-left-space .view-header {
+  padding-left: calc(var(--frame-left-space) + var(--size-4-3));
+}

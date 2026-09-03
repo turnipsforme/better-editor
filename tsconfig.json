@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noImplicitAny": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "target": "ES2018",
+    "useUnknownInCatchVariables": true,
+    "lib": ["DOM", "ES2018"]
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

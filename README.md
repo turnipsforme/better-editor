@@ -1,0 +1,75 @@
+# Better Editor
+
+Better Editor brings a set of focused writing and workspace tools into one Obsidian plugin. Every feature has its own switch in **Settings → Better Editor**. Turning a feature off also removes its commands and stops its automatic behavior.
+
+## Features
+
+### Website link filing
+
+**Better Editor: Move standalone website links to Links list** moves lone `http://` and `https://` links under a `[[Links]]` list. It leaves paragraph links, task links, images, inline code, and fenced code alone.
+
+### Note organizer
+
+**Better Editor: Organize current note** can be run at any time, even when automatic organization is off. It:
+
+- removes blank lines outside frontmatter and fenced code
+- moves top-level tasks below the first Tasks, To-do, or similar heading
+- moves simple note lines below the first Notes heading and adds bullets where needed
+- files standalone website links when Website link filing is enabled
+
+The organizer leaves YAML frontmatter, fenced code, Markdown headings, indented content, and compound list blocks alone. **Organize notes when opened** can run the same organizer automatically. **Only daily notes** limits it to the Daily notes core plugin's folder and date format.
+
+### Smart selection
+
+**Better Editor: Expand selection by paragraph, section, then note** grows the selection in three steps:
+
+1. Select the current paragraph without its list or task marker.
+2. Select the text below the current heading and above the next heading.
+3. Select the whole note except its first top-level `#` heading.
+
+### Task marker deletion
+
+When Backspace or Delete reaches a task marker such as `- [ ] ` or `- [x] `, Better Editor removes the marker as one unit. This also works with multiple cursors.
+
+### Tab bar controls
+
+The desktop-only **Better Editor: Toggle tab bar visibility** command hides or shows the main tab bar. It keeps the editor in the freed space and adds a configurable top gradient behind the window controls. The tab bar can also hide automatically when only one main tab is open.
+
+### Linked file deletion
+
+**Better Editor: Delete current file and clean linked mentions** uses Obsidian's normal deletion confirmation and configured trash location. Before deleting the file, it updates links to that file in other Markdown notes. In settings, choose either:
+
+- **Keep their display text** to turn wiki links and Markdown links into unlinked text
+- **Remove them completely** to remove only the matching link tokens
+
+Better Editor prepares and validates every edit before changing a linked note. If a note changes during deletion or every mention cannot be located safely, deletion stops. If moving the file to trash fails, completed link edits are restored when it is safe to do so.
+
+## Installation
+
+### BRAT
+
+1. Install BRAT in Obsidian.
+2. Add `turnipsforme/better-editor` as a beta plugin.
+3. Enable **Better Editor** in **Settings → Community plugins**.
+
+### Manual
+
+Copy `main.js`, `manifest.json`, and `styles.css` into:
+
+```text
+<vault>/.obsidian/plugins/better-editor/
+```
+
+Then reload Obsidian and enable **Better Editor**.
+
+## Development
+
+```sh
+npm install
+npm test
+npm run build
+```
+
+## License
+
+Better Editor is released under the MIT License. See [LICENSE](LICENSE).
