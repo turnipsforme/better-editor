@@ -1,7 +1,6 @@
 import esbuild from "esbuild";
 import process from "node:process";
 import { builtinModules } from "node:module";
-import builtinModulesPackage from "builtin-modules";
 
 const production = process.argv[2] === "production";
 const context = await esbuild.context({
@@ -10,12 +9,9 @@ const context = await esbuild.context({
   external: [
     "obsidian",
     "electron",
-    "@codemirror/language",
-    "@codemirror/rangeset",
     "@codemirror/state",
     "@codemirror/view",
-    ...builtinModules,
-    ...builtinModulesPackage
+    ...builtinModules
   ],
   format: "cjs",
   target: "es2018",

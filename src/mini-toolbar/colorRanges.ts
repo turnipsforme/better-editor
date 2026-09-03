@@ -2,11 +2,13 @@ import {
   ChangeDesc,
   EditorState,
   Extension,
+  type Range as CodeMirrorRange,
   StateEffect,
   StateField,
 } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView } from "@codemirror/view";
-import { editorInfoField, editorViewField } from "obsidian";
+import { editorInfoField } from "obsidian";
+import { getCodeMirrorView } from "./editor-view";
 
 export interface ColorRange {
   from: number;
@@ -88,10 +90,9 @@ const clampRangesToDoc = (ranges: Range[], len: number): Range[] => {
 
 const isMainEditorView = (state: EditorState): boolean => {
   try {
-    const view = state.field(editorViewField) as unknown as EditorView | undefined;
+    const view = getCodeMirrorView(state);
     if (!view) return true;
-    const el = view.dom as HTMLElement | null;
-    return !el?.closest?.(".cm-table-widget");
+    return !view.dom.closest(".cm-table-widget");
   } catch {
     return true;
   }
@@ -246,7 +247,7 @@ const buildDecorations = (
   bg: ColorRange[],
   underline: Range[],
 ): DecorationSet => {
-  const ranges: any[] = [];
+  const ranges: CodeMirrorRange<Decoration>[] = [];
 
   for (const r of text) {
     ranges.push(
@@ -292,10 +293,7 @@ export const createColorExtension = (
     create(state) {
       let path: string | null = null;
       try {
-        // editorInfoField stores a MarkdownView-like object for this editor.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mdView = state.field(editorInfoField) as any;
-        const file = mdView?.file;
+        const file = state.field(editorInfoField).file;
         if (file && typeof file.path === "string") path = file.path;
       } catch {
         path = null;
@@ -337,9 +335,7 @@ export const createColorExtension = (
       let dirty = false;
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mdView = tr.state.field(editorInfoField) as any;
-        const file = mdView?.file;
+        const file = tr.state.field(editorInfoField).file;
         if (file && typeof file.path === "string") path = file.path;
         else path = null;
       } catch {

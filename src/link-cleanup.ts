@@ -15,7 +15,21 @@ export interface RewriteResult {
 }
 
 function unescapeDisplayText(text: string): string {
-  return text.replace(/\\([\\|\[\]])/g, "$1");
+  let result = "";
+  for (let index = 0; index < text.length; index++) {
+    const character = text[index];
+    const next = text[index + 1];
+    if (
+      character === "\\" &&
+      (next === "\\" || next === "|" || next === "[" || next === "]")
+    ) {
+      result += next;
+      index++;
+    } else {
+      result += character;
+    }
+  }
+  return result;
 }
 
 function markdownLabel(original: string): string | null {

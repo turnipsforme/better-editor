@@ -102,13 +102,13 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
     this.syncFeatureState();
   }
 
-  async onunload(): Promise<void> {
+  onunload(): void {
     this.tabBar.destroy();
     this.miniToolbar.destroy();
     if (this.persistHandle !== null) {
       window.clearTimeout(this.persistHandle);
       this.persistHandle = null;
-      await this.saveData(this.settings);
+      void this.saveData(this.settings);
     }
   }
 

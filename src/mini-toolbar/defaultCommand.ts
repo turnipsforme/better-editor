@@ -3,6 +3,7 @@ import { EditorView } from "@codemirror/view";
 import { App, editorInfoField } from "obsidian";
 
 import { setBgColorEffect, setTextColorEffect, setUnderlineEffect } from "./colorRanges";
+import { getCodeMirrorView } from "./editor-view";
 import { toHeadingLine } from "./heading";
 
 interface AppWithCommands extends App {
@@ -15,14 +16,14 @@ export const cutText = (state: EditorState) => {
   const editor = getEditorFromState(state);
   if (!editor) return;
   const originText = editor.getSelection();
-  window.navigator.clipboard.writeText(editor.getSelection());
+  void window.navigator.clipboard.writeText(editor.getSelection());
   editor.replaceSelection("", originText);
 };
 
 export const copyText = (state: EditorState) => {
   const editor = getEditorFromState(state);
   if (!editor) return;
-  window.navigator.clipboard.writeText(editor?.getSelection());
+  void window.navigator.clipboard.writeText(editor.getSelection());
 };
 
 // Apply a markdown heading to the full line containing the selection. Any
@@ -59,15 +60,7 @@ export const getEditorFromState = (state: EditorState) => {
 
 const getViewFromState = (state: EditorState): EditorView | null => {
   try {
-    // editorInfoField gives us the MarkdownView; from there we can grab the
-    // underlying CM6 EditorView via the internal `cm`/`cmEditor` property.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mdView = state.field(editorInfoField) as any;
-    const editor = mdView?.editor as any;
-    const cm: EditorView | undefined =
-      editor?.cm ?? editor?.cmEditor ?? editor?.cm6;
-    if (cm && typeof (cm as any).dispatch === "function") return cm;
-    return null;
+    return getCodeMirrorView(state);
   } catch {
     return null;
   }
@@ -92,20 +85,17 @@ export const NOTION_TEXT_COLOR_NAMES: string[] = [
 ];
 
 // Notion-like highlight background palette (approximate)
-export const NOTION_BG_COLOR_MAP: Record<string, string> = {
-  Gray: "#EAEAEA",
-  Brown: "#EEE0DA",
-  Orange: "#FAEBDD",
-  Yellow: "#FBF3DB",
-  Green: "#DDEDEA",
-  Blue: "#DDEBF1",
-  Purple: "#EAE4F2",
-  Pink: "#F4DFEB",
-  Red: "#FBE4E4",
-};
 export const NOTION_BG_COLOR_NAMES: string[] = [
   "Default",
-  ...Object.keys(NOTION_BG_COLOR_MAP),
+  "Gray",
+  "Brown",
+  "Orange",
+  "Yellow",
+  "Green",
+  "Blue",
+  "Purple",
+  "Pink",
+  "Red",
 ];
 
 // Apply or remove text color via CM6 decorations and colorRanges state.

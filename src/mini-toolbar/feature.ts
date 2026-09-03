@@ -248,9 +248,11 @@ export class MiniToolbarFeature {
           fragments.push(doc.createTextNode(slice));
         } else {
           const span = doc.createElement("span");
-          if (textColor) span.style.color = textColor;
-          if (backgroundColor) span.style.backgroundColor = backgroundColor;
-          if (underline) span.style.textDecoration = "underline";
+          span.setCssStyles({
+            color: textColor ?? "",
+            backgroundColor: backgroundColor ?? "",
+            textDecoration: underline ? "underline" : "",
+          });
           span.textContent = slice;
           fragments.push(span);
         }

@@ -1,11 +1,4 @@
-import { getApi } from "@aidenlx/obsidian-icon-shortcodes";
-import {
-  lineClassNodeProp,
-  syntaxTree,
-  tokenClassNodeProp,
-} from "@codemirror/language";
 import { EditorState, StateField } from "@codemirror/state";
-import { SyntaxNode } from "@lezer/common";
 import {
   App,
   BaseComponent,
@@ -28,10 +21,10 @@ import {
   setTextColorByName,
   NOTION_TEXT_COLOR_MAP,
   NOTION_BG_COLOR_NAMES,
-  NOTION_BG_COLOR_MAP,
   setBgColorByName,
   toggleUnderline,
 } from "./defaultCommand";
+import { isCodeMirrorView, type EditorWithCodeMirror } from "./editor-view";
 import {
   headingLevelForAction,
   isHeadingAction,
@@ -66,7 +59,7 @@ const getCursorTooltips = (
   const { anchor, head, empty } = sel;
   let [start, end] = [anchor, head].sort();
 
-  const createToolbar = (container: any) => {
+  const createToolbar = (container: HTMLElement) => {
     const toolbar = new ToolBar(container)
       .addSmallButton((btn) =>
         btn.setIcon("scissors").onClick(() => cutText(state)),
@@ -183,19 +176,26 @@ export const refreshVisibleToolbars = (app: App) => {
   // Journal View mounts Obsidian's own markdown editors for each day; they are
   // covered by the injection below, so refresh them too.
   const leafTypes = ["markdown", "journal-view"];
-  for (const type of leafTypes)
-  for (const leaf of app.workspace.getLeavesOfType(type)) {
-    const editor = (leaf.view as any)?.editor;
-    const cm = editor?.cm ?? editor?.cmEditor ?? editor?.cm6;
-    if (cm?.dispatch) {
-      cm.dispatch({ effects: refreshMiniToolbarEffect.of(undefined) });
+  for (const type of leafTypes) {
+    for (const leaf of app.workspace.getLeavesOfType(type)) {
+      const view = leaf.view as typeof leaf.view & {
+        editor?: EditorWithCodeMirror;
+      };
+      const cm = view.editor?.cm ?? view.editor?.cmEditor ?? view.editor?.cm6;
+      if (isCodeMirrorView(cm)) {
+        cm.dispatch({ effects: refreshMiniToolbarEffect.of(undefined) });
+      }
     }
   }
 };
 
+const getComponentDom = (component: object): HTMLElement | undefined => {
+  const dom = (component as { dom?: unknown }).dom;
+  return dom instanceof HTMLElement ? dom : undefined;
+};
+
 class SmallButton extends BaseComponent {
   button: ButtonComponent;
-  disabled = false;
   dropdownOptions: string[] = [];
   onSelectOption: ((title: string) => void) | null = null;
   onSelectBgOption: ((title: string) => void) | null = null;
@@ -207,35 +207,8 @@ class SmallButton extends BaseComponent {
     this.button = new ButtonComponent(containerEl);
   }
 
-  setDisabled(disabled: boolean): this {
-    this.button.setDisabled(disabled);
-    this.disabled = disabled;
-    return this;
-  }
-
-  /**
-   * @param iconId icon name in obsidian or icon shortcode
-   */
   setIcon(iconId: string): this {
-    const iconSize = 14;
     this.button.setIcon(iconId);
-    let iconSC, icon;
-    if (
-      !this.button.buttonEl.querySelector("svg") &&
-      (iconSC = getApi()) &&
-      (icon = iconSC.getIcon(iconId, false))
-    ) {
-      const sizeAttr = {
-        width: iconSize,
-        height: iconSize,
-      };
-      if (typeof icon === "string") {
-        this.button.buttonEl.createDiv({ text: icon, attr: sizeAttr });
-      } else {
-        Object.assign(icon, sizeAttr);
-        this.button.buttonEl.appendChild(icon);
-      }
-    }
     return this;
   }
 
@@ -250,26 +223,6 @@ class SmallButton extends BaseComponent {
     return this;
   }
 
-  setClass(cls: string): this {
-    this.button.setClass(cls);
-    return this;
-  }
-
-  setDropdownText(state: EditorState): this {
-    const textDiv = this.button.buttonEl.createDiv("better-editor-mini-toolbar-text");
-    const iconDiv = this.button.buttonEl.createDiv(
-      "better-editor-mini-toolbar-icon-with-text",
-    );
-    setIcon(iconDiv, "chevron-down");
-
-    const linePos = state.doc.lineAt(state.selection.ranges[0].from)?.from;
-    let syntaxNode = syntaxTree(state).resolveInner(linePos + 1);
-    // @ts-ignore
-    let nodeProps: string = syntaxNode.type.prop(tokenClassNodeProp);
-    textDiv.setText(this.detectFormat(nodeProps, syntaxNode) || "Text");
-    return this;
-  }
-
   setDropdownIcon(iconId: string = "highlighter"): this {
     const highlightIconDiv = this.button.buttonEl.createDiv(
       "better-editor-mini-toolbar-highlight-icon",
@@ -281,37 +234,6 @@ class SmallButton extends BaseComponent {
     setIcon(iconDiv, "chevron-down");
 
     return this;
-  }
-
-  detectFormat(nodeProps: string, syntaxNode: SyntaxNode): string | undefined {
-    if (!nodeProps) return "Text";
-    if (nodeProps.includes("strong")) return "Bold";
-    if (nodeProps.includes("em")) return "Italic";
-    if (nodeProps.includes("strikethrough")) return "Strike";
-    if (nodeProps.contains("hmd-codeblock")) {
-      return "CodeBlock";
-    }
-    if (nodeProps.contains("hmd-inline-code")) {
-      return "Code";
-    }
-    if (nodeProps.contains("formatting-header")) {
-      const headingLevel = nodeProps.match(/header-\d{1,}/);
-      if (headingLevel) {
-        return "Heading " + headingLevel[0].slice(-1);
-      }
-    }
-    if (
-      nodeProps.contains("formatting-list") ||
-      nodeProps.contains("hmd-list-indent")
-    ) {
-      if (syntaxNode?.parent) {
-        // @ts-ignore
-        const nodeProps = syntaxNode.parent?.type.prop(lineClassNodeProp);
-        if (nodeProps?.contains("HyperMD-task-line")) return "To-do list";
-      }
-      if (nodeProps.contains("formatting-list-ol")) return "Numbered list";
-      if (nodeProps.contains("formatting-list-ul")) return "Bulleted list";
-    }
   }
 
   setTooltip(tooltip: string): this {
@@ -343,8 +265,6 @@ class SmallButton extends BaseComponent {
     return this;
   }
 
-  // analyzeMarkdownFormat(text: string): string {}
-
   showEditMenu(event: MouseEvent): void {
     this.menuOpened = !this.menuOpened;
     if (!this.menuOpened) {
@@ -356,16 +276,14 @@ class SmallButton extends BaseComponent {
     });
 
     // Customize menu DOM to mimic Notion color picker
-    const menuEl = (this.menu as any).dom as HTMLElement | undefined;
+    const menuEl = getComponentDom(this.menu);
     if (menuEl) {
-      (menuEl as any).addClass?.("better-editor-mini-toolbar-color-menu");
+      menuEl.addClass("better-editor-mini-toolbar-color-menu");
       // Defer grid/header decoration until after items are rendered
     }
 
     const sortButton = event.currentTarget as HTMLElement;
-    const currentTargetRect = (
-      event.currentTarget as HTMLElement
-    )?.getBoundingClientRect();
+    const currentTargetRect = sortButton.getBoundingClientRect();
     const menuShowPoint = {
       x: currentTargetRect.left - 6,
       y: currentTargetRect.bottom + 6,
@@ -382,15 +300,15 @@ class SmallButton extends BaseComponent {
           this.onSelectOption?.(name);
         });
         const tooltip = name === "Default" ? "Default" : `${name} text`;
-        const itemEl = (item as any).dom as HTMLElement | undefined;
-        itemEl?.setAttr?.("title", tooltip);
-        itemEl?.setAttr?.("data-color-kind", "text");
-        itemEl?.addClass?.("better-editor-mini-toolbar-color-item");
-        const titleEl = itemEl?.querySelector?.(
+        const itemEl = getComponentDom(item);
+        itemEl?.setAttr("title", tooltip);
+        itemEl?.setAttr("data-color-kind", "text");
+        itemEl?.addClass("better-editor-mini-toolbar-color-item");
+        const titleEl = itemEl?.querySelector(
           ".menu-item-title",
         ) as HTMLElement | undefined;
         if (titleEl) {
-          titleEl.style.color = `${colorHex}`;
+          titleEl.setCssStyles({ color: colorHex });
         }
       });
     }
@@ -407,21 +325,18 @@ class SmallButton extends BaseComponent {
           this.onSelectBgOption?.(name);
         });
         const tooltip = name === "Default" ? "Default background" : `${name} background`;
-        const itemEl = (item as any).dom as HTMLElement | undefined;
-        itemEl?.setAttr?.("title", tooltip);
-        itemEl?.setAttr?.("data-color-kind", "background");
-        itemEl?.addClass?.("better-editor-mini-toolbar-color-item");
-        const titleEl = itemEl?.querySelector?.(
+        const itemEl = getComponentDom(item);
+        itemEl?.setAttr("title", tooltip);
+        itemEl?.setAttr("data-color-kind", "background");
+        itemEl?.addClass("better-editor-mini-toolbar-color-item");
+        const titleEl = itemEl?.querySelector(
           ".menu-item-title",
         ) as HTMLElement | undefined;
         if (titleEl) {
-          if (colorValue === "transparent") {
-            titleEl.style.removeProperty("background-color");
-          } else {
-            titleEl.style.backgroundColor = colorValue as any;
-          }
-          // Keep text legible against light/dark tints
-          titleEl.style.color = `var(--text-normal)`;
+          titleEl.setCssStyles({
+            backgroundColor: colorValue,
+            color: "var(--text-normal)",
+          });
         }
       });
     }
@@ -429,8 +344,8 @@ class SmallButton extends BaseComponent {
     this.menu.setParentElement(sortButton).showAtPosition(menuShowPoint);
 
     // Decorate once DOM is fully built
-    requestAnimationFrame(() => {
-      const menuEl = (this.menu as any)?.dom as HTMLElement | undefined;
+    window.requestAnimationFrame(() => {
+      const menuEl = this.menu ? getComponentDom(this.menu) : undefined;
       if (!menuEl) return;
       const scrollerEl =
         (menuEl.querySelector(".menu-scroller") as HTMLElement | null) ||
@@ -445,7 +360,7 @@ class SmallButton extends BaseComponent {
         const bgGroup = scrollerEl.createDiv({ cls: "menu-group" });
         const allItems = Array.from(groups[0].querySelectorAll<HTMLElement>(".menu-item"));
         for (const it of allItems) {
-          const kind = (it as any).getAttr?.("data-color-kind") ?? it.getAttribute("data-color-kind");
+          const kind = it.getAttr("data-color-kind");
           if (kind === "background") {
             bgGroup.appendChild(it);
           }
@@ -455,7 +370,8 @@ class SmallButton extends BaseComponent {
         groups = [groups[0], bgGroup];
       }
 
-      const [textGroup, bgGroup] = groups.length >= 2 ? groups : [groups[0], undefined as any];
+      const textGroup = groups[0];
+      const bgGroup = groups[1];
 
       if (textGroup) {
         const textHeader = scrollerEl.createDiv({
@@ -463,8 +379,7 @@ class SmallButton extends BaseComponent {
           text: "Text colour",
         });
         scrollerEl.insertBefore(textHeader, textGroup);
-        // @ts-ignore
-        textGroup.addClass?.("better-editor-mini-toolbar-color-grid");
+        textGroup.addClass("better-editor-mini-toolbar-color-grid");
       }
       if (bgGroup) {
         const bgHeader = scrollerEl.createDiv({
@@ -472,16 +387,11 @@ class SmallButton extends BaseComponent {
           text: "Background",
         });
         scrollerEl.insertBefore(bgHeader, bgGroup);
-        // @ts-ignore
-        bgGroup.addClass?.("better-editor-mini-toolbar-color-grid");
+        bgGroup.addClass("better-editor-mini-toolbar-color-grid");
       }
     });
   }
 
-  then(cb: (component: this) => any): this {
-    cb(this);
-    return this;
-  }
 }
 
 export class ToolBar extends Component {
@@ -490,14 +400,11 @@ export class ToolBar extends Component {
 
   constructor(container: HTMLElement) {
     super();
-    this.dom = container.createDiv(
-      { cls: "cm-better-editor-mini-toolbar" },
-      (el) => (el.style.position = "absolute"),
-    );
+    this.dom = container.createDiv({ cls: "cm-better-editor-mini-toolbar" });
     this.smallBtnContainer = this.dom;
   }
 
-  addSmallButton(cb: (button: SmallButton) => any): this {
+  addSmallButton(cb: (button: SmallButton) => unknown): this {
     cb(new SmallButton(this.smallBtnContainer));
     return this;
   }

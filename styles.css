@@ -40,4 +40,143 @@
 }
 
 /* Mini toolbar and its text/background color menu. */
-.cm-better-editor-mini-toolbar{width:auto;height:auto;padding:3px;display:flex;user-select:none;border-radius:6px;flex-wrap:wrap;align-items:center;justify-content:flex-start;z-index:var(--layer-menu);border:1px solid var(--background-modifier-border);background-color:var(--background-primary)}.cm-better-editor-mini-toolbar button{margin:2px;border:none;display:flex;cursor:pointer;padding:5px;box-shadow:none;position:relative;border-radius:3px;font-size:var(--editor-font-size);background-color:var(--background-primary-alt)}.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-icon-with-text{padding:0;margin-left:6px;margin-bottom:-6px;margin-right:-2px}.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-highlight-icon,.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-icon-with-icon{padding:0;margin-bottom:-6px}.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-heading-icon{font-size:14px;font-weight:600;line-height:14px}.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-heading-icon sup{font-size:9px;line-height:1}.theme-light{--better-editor-toolbar-bg-gray: #EAEAEA;--better-editor-toolbar-bg-brown: #EEE0DA;--better-editor-toolbar-bg-orange: #FAEBDD;--better-editor-toolbar-bg-yellow: #FBF3DB;--better-editor-toolbar-bg-green: #DDEDEA;--better-editor-toolbar-bg-blue: #DDEBF1;--better-editor-toolbar-bg-purple: #EAE4F2;--better-editor-toolbar-bg-pink: #F4DFEB;--better-editor-toolbar-bg-red: #FBE4E4}.theme-dark{--better-editor-toolbar-bg-gray: #2F2F2F;--better-editor-toolbar-bg-brown: #3A2E29;--better-editor-toolbar-bg-orange: #4A3A2A;--better-editor-toolbar-bg-yellow: #4A4526;--better-editor-toolbar-bg-green: #2A3F39;--better-editor-toolbar-bg-blue: #253847;--better-editor-toolbar-bg-purple: #372F4A;--better-editor-toolbar-bg-pink: #4A2B3A;--better-editor-toolbar-bg-red: #4A2E2E}.better-editor-mini-toolbar-color-menu.menu{width:auto;padding:6px 8px}.better-editor-mini-toolbar-color-menu .better-editor-mini-toolbar-color-header{font-size:12px;color:var(--text-muted);margin:6px 8px 2px}.better-editor-mini-toolbar-color-menu .menu-group,.better-editor-mini-toolbar-color-menu .better-editor-mini-toolbar-color-grid{display:grid;grid-template-columns:repeat(5,28px);gap:8px;padding:6px 8px 10px}.better-editor-mini-toolbar-color-menu .menu-group .menu-item,.better-editor-mini-toolbar-color-menu .better-editor-mini-toolbar-color-grid .menu-item{width:28px!important;height:28px!important;padding:0!important;margin:0!important}.better-editor-mini-toolbar-color-menu .menu-group .menu-item .menu-item-icon,.better-editor-mini-toolbar-color-menu .better-editor-mini-toolbar-color-grid .menu-item .menu-item-icon{display:none}.better-editor-mini-toolbar-color-menu .menu-group .menu-item .menu-item-title,.better-editor-mini-toolbar-color-menu .better-editor-mini-toolbar-color-grid .menu-item .menu-item-title{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:700;border-radius:6px;border:1px solid var(--background-modifier-border);background-color:var(--background-primary)}.better-editor-mini-toolbar-color-menu .menu-group .menu-item:hover .menu-item-title,.better-editor-mini-toolbar-color-menu .better-editor-mini-toolbar-color-grid .menu-item:hover .menu-item-title{border-color:var(--interactive-accent)}
+.cm-better-editor-mini-toolbar {
+  position: absolute;
+  width: auto;
+  height: auto;
+  padding: 3px;
+  display: flex;
+  user-select: none;
+  border-radius: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  z-index: var(--layer-menu);
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+}
+
+.cm-better-editor-mini-toolbar button {
+  margin: 2px;
+  border: none;
+  display: flex;
+  cursor: pointer;
+  padding: 5px;
+  box-shadow: none;
+  position: relative;
+  border-radius: 3px;
+  font-size: var(--editor-font-size);
+  background-color: var(--background-primary-alt);
+}
+
+.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-icon-with-text {
+  padding: 0;
+  margin-left: 6px;
+  margin-bottom: -6px;
+  margin-right: -2px;
+}
+
+.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-highlight-icon,
+.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-icon-with-icon {
+  padding: 0;
+  margin-bottom: -6px;
+}
+
+.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-heading-icon {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 14px;
+}
+
+.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-heading-icon sup {
+  font-size: 9px;
+  line-height: 1;
+}
+
+.theme-light {
+  --better-editor-toolbar-bg-gray: #eaeaea;
+  --better-editor-toolbar-bg-brown: #eee0da;
+  --better-editor-toolbar-bg-orange: #faebdd;
+  --better-editor-toolbar-bg-yellow: #fbf3db;
+  --better-editor-toolbar-bg-green: #ddedea;
+  --better-editor-toolbar-bg-blue: #ddebf1;
+  --better-editor-toolbar-bg-purple: #eae4f2;
+  --better-editor-toolbar-bg-pink: #f4dfeb;
+  --better-editor-toolbar-bg-red: #fbe4e4;
+}
+
+.theme-dark {
+  --better-editor-toolbar-bg-gray: #2f2f2f;
+  --better-editor-toolbar-bg-brown: #3a2e29;
+  --better-editor-toolbar-bg-orange: #4a3a2a;
+  --better-editor-toolbar-bg-yellow: #4a4526;
+  --better-editor-toolbar-bg-green: #2a3f39;
+  --better-editor-toolbar-bg-blue: #253847;
+  --better-editor-toolbar-bg-purple: #372f4a;
+  --better-editor-toolbar-bg-pink: #4a2b3a;
+  --better-editor-toolbar-bg-red: #4a2e2e;
+}
+
+.better-editor-mini-toolbar-color-menu.menu {
+  width: auto;
+  padding: 6px 8px;
+}
+
+.better-editor-mini-toolbar-color-menu .better-editor-mini-toolbar-color-header {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 6px 8px 2px;
+}
+
+.better-editor-mini-toolbar-color-menu .menu-group,
+.better-editor-mini-toolbar-color-menu .better-editor-mini-toolbar-color-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 28px);
+  gap: 8px;
+  padding: 6px 8px 10px;
+}
+
+.better-editor-mini-toolbar-color-menu .menu-group .menu-item,
+.better-editor-mini-toolbar-color-menu
+  .better-editor-mini-toolbar-color-grid
+  .menu-item {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin: 0;
+}
+
+.better-editor-mini-toolbar-color-menu .menu-group .menu-item .menu-item-icon,
+.better-editor-mini-toolbar-color-menu
+  .better-editor-mini-toolbar-color-grid
+  .menu-item
+  .menu-item-icon {
+  display: none;
+}
+
+.better-editor-mini-toolbar-color-menu .menu-group .menu-item .menu-item-title,
+.better-editor-mini-toolbar-color-menu
+  .better-editor-mini-toolbar-color-grid
+  .menu-item
+  .menu-item-title {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+}
+
+.better-editor-mini-toolbar-color-menu
+  .menu-group
+  .menu-item:hover
+  .menu-item-title,
+.better-editor-mini-toolbar-color-menu
+  .better-editor-mini-toolbar-color-grid
+  .menu-item:hover
+  .menu-item-title {
+  border-color: var(--interactive-accent);
+}

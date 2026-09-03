@@ -5,15 +5,14 @@ import {
   ViewUpdate,
 } from "@codemirror/view";
 import { ClientRectObject } from "@floating-ui/core";
-import { computePosition, flip, offset } from "@floating-ui/dom";
+import { computePosition, flip, offset, shift } from "@floating-ui/dom";
 import equal from "fast-deep-equal";
-import { editorInfoField, Menu, Platform } from "obsidian";
+import { editorInfoField } from "obsidian";
 
 import { ToolBar } from "../toolbar";
 import { tooltipConfig } from "./config";
 import { ToolbarEventName, Tooltip } from "./define";
 import { showTooltip } from "./index";
-import { shift } from "./shift";
 
 const getRectFromXY = (x = 0, y = 0): ClientRectObject => ({
   width: 0,
@@ -27,10 +26,9 @@ const getRectFromXY = (x = 0, y = 0): ClientRectObject => ({
 });
 
 const isEmbeddedEditorView = (view: EditorView): boolean => {
-  const el = view.dom as HTMLElement;
   // Known wrapper for Obsidian Live Preview table cell editors.
   // Keep the selector narrow to avoid false positives.
-  return !!el.closest(".cm-table-widget");
+  return !!view.dom.closest(".cm-table-widget");
 };
 
 const isSelectionInsideEmbeddedChild = (view: EditorView): boolean => {
@@ -90,9 +88,6 @@ class ViewPluginClass implements PluginValue {
   inView = true;
 
   defaultPlacement = this.view.state.facet(tooltipConfig).defaultPlacement;
-  editorMenu: {
-    currMenu: Menu | null;
-  };
 
   constructor(readonly view: EditorView) {
     this.tooltipInfo = view.state.facet(showTooltip);
@@ -105,38 +100,12 @@ class ViewPluginClass implements PluginValue {
       // contextElement: this.view.scrollDOM,
     };
     this.maybeMeasure();
-    this.editorMenu = {
-      currMenu: null,
-    };
   }
 
   shouldRemoveToolbar(input?: Tooltip | null): boolean {
     if (this.embedded) return true;
     const info = input ?? this.tooltipInfo;
-    // if without selection and no menu present
-    return !(info?.end || this.editorMenu.currMenu);
-  }
-
-  onEditorMenuOpen(menu: Menu) {
-    if (this.embedded) return;
-    if (!this.editorMenu.currMenu) {
-      this.editorMenu.currMenu = menu;
-      if (this.cachedRefRect) this.computePosition(this.cachedRefRect);
-      else this.maybeMeasure();
-      if (!Platform.isMacOS && this.tooltipInfo) {
-        this.createToolbar();
-        this.maybeMeasure();
-      }
-    }
-  }
-
-  onEditorMenuClose(menu: Menu) {
-    if (this.editorMenu.currMenu === menu) {
-      this.editorMenu.currMenu = null;
-    }
-    if (!Platform.isMacOS && this.toolbar && this.shouldRemoveToolbar()) {
-      this.removeToolbar();
-    }
+    return !info?.end;
   }
 
   createToolbar(input?: Tooltip): void {
@@ -190,7 +159,6 @@ class ViewPluginClass implements PluginValue {
   }
 
   destroy(): void {
-    this.editorMenu.currMenu = null;
     this.removeToolbar();
     this.toolbar = null;
   }
@@ -220,7 +188,7 @@ class ViewPluginClass implements PluginValue {
       const refRect = getRectFromPosCoords(startRect, endRect);
       if (refRect) {
         this.cachedRefRect = refRect;
-        this.computePosition(refRect);
+        void this.computePosition(refRect);
       }
     }
   };
@@ -234,11 +202,7 @@ class ViewPluginClass implements PluginValue {
       middleware: [
         offset({ mainAxis: 5 }),
         flip({ padding, boundary: this.view.scrollDOM }),
-        shift({
-          padding,
-          boundary: this.view.scrollDOM,
-          editorMenu: this.editorMenu.currMenu,
-        }),
+        shift({ padding, boundary: this.view.scrollDOM }),
       ],
     });
     Object.assign(this.toolbar.dom.style, {
@@ -254,8 +218,6 @@ class ViewPluginClass implements PluginValue {
       this.view.requestMeasure({ read: this.readFromDOM });
     if (this.inView != this.view.inView) {
       this.inView = this.view.inView;
-      if (!this.inView) {
-      }
     }
   }
 }
