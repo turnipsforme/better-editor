@@ -31,6 +31,14 @@ The organizer leaves YAML frontmatter, fenced code, Markdown headings, indented 
 
 When Backspace or Delete reaches a task marker such as `- [ ] ` or `- [x] `, Better Editor removes the marker as one unit. This also works with multiple cursors.
 
+### Mini toolbar
+
+On desktop, a floating toolbar appears when you select text. It includes cut, copy, bold, italic, strikethrough, underline, and a color menu for text and highlights.
+
+The Copy, Strikethrough, and Underline buttons can each be changed to Heading 2, Heading 3, or Heading 4 in Better Editor's settings. Heading actions replace an existing heading marker cleanly. The toolbar and saved styling also work in Journal View editors, while small embedded editors such as table cells are left alone.
+
+Text colors, highlights, and underlines are stored in Better Editor's local plugin data instead of being written into the Markdown. They will not appear in other Markdown apps and are hidden while the Mini toolbar feature is disabled.
+
 ### Tab bar controls
 
 The desktop-only **Better Editor: Toggle tab bar visibility** command hides or shows the main tab bar. It keeps the editor in the freed space and adds a configurable top gradient behind the window controls. The tab bar can also hide automatically when only one main tab is open.
@@ -69,6 +77,14 @@ npm install
 npm test
 npm run build
 ```
+
+## Privacy
+
+Better Editor works locally. It does not require an account, make network requests, use telemetry, or access files outside your Obsidian vault.
+
+## Credits
+
+The mini toolbar is based on [xRyul's Mini Toolbar V2](https://github.com/xRyul/obsidian-mini-toolbar-v2), which builds on [Quorafind's Mini Toolbar](https://github.com/Quorafind/Obsidian-Mini-Toolbar). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for its license notice.
 
 ## License
 

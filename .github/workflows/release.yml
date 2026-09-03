@@ -21,7 +21,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - name: Package Better Editor
-        run: zip "better-editor-${GITHUB_REF_NAME}.zip" main.js manifest.json styles.css README.md LICENSE
+        run: zip "better-editor-${GITHUB_REF_NAME}.zip" main.js manifest.json styles.css README.md LICENSE THIRD_PARTY_NOTICES.md
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -10,6 +10,8 @@ import {
   type Editor
 } from "obsidian";
 import { CurrentFileDeletion } from "./delete-current-file";
+import { MiniToolbarFeature } from "./mini-toolbar/feature";
+import { normalizeToolbarAction } from "./mini-toolbar/toolbar-settings";
 import { moveWebsiteLinks, organizeCurrentNote } from "./note-organizer";
 import {
   BetterEditorSettingTab,
@@ -45,6 +47,8 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
   private readonly registeredCommandIds = new Set<string>();
   private tabBar!: TabBarController;
   private fileDeletion!: CurrentFileDeletion;
+  private miniToolbar!: MiniToolbarFeature;
+  private persistHandle: number | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -59,13 +63,35 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
       this.app,
       () => this.settings.linkedMentionAction
     );
+    this.miniToolbar = new MiniToolbarFeature(
+      this.app,
+      () => ({
+        enabled: this.settings.miniToolbarEnabled && Platform.isDesktopApp,
+        copyButtonAction: this.settings.miniToolbarCopyAction,
+        strikethroughButtonAction: this.settings.miniToolbarStrikethroughAction,
+        underlineButtonAction: this.settings.miniToolbarUnderlineAction,
+        colors: this.settings.miniToolbarColors
+      }),
+      () => this.queuePersistence()
+    );
 
+    this.registerEditorExtension(this.miniToolbar.editorExtensions);
     this.registerEditorExtension(
       createTaskMarkerDeletionExtensions(() => this.settings.taskMarkerDeletionEnabled)
     );
     this.addSettingTab(new BetterEditorSettingTab(this.app, this));
 
-    this.registerEvent(this.app.workspace.on("layout-change", () => this.tabBar.refresh()));
+    this.registerEvent(this.app.workspace.on("layout-change", () => {
+      this.tabBar.refresh();
+      this.miniToolbar.scheduleJournalInjection();
+    }));
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", this.miniToolbar.scheduleJournalInjection)
+    );
+    this.app.workspace.onLayoutReady(() => this.miniToolbar.onLayoutReady());
+    this.registerMarkdownPostProcessor((element, context) => {
+      this.miniToolbar.processReadingView(element, context);
+    });
     this.registerEvent(this.app.workspace.on("file-open", (file) => {
       if (!file) return;
       void this.organizeNoteOnOpen(file).catch((error: unknown) => {
@@ -76,8 +102,14 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
     this.syncFeatureState();
   }
 
-  onunload(): void {
+  async onunload(): Promise<void> {
     this.tabBar.destroy();
+    this.miniToolbar.destroy();
+    if (this.persistHandle !== null) {
+      window.clearTimeout(this.persistHandle);
+      this.persistHandle = null;
+      await this.saveData(this.settings);
+    }
   }
 
   async updateSettings(changes: Partial<BetterEditorSettings>): Promise<void> {
@@ -87,7 +119,24 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
   }
 
   private async loadSettings(): Promise<void> {
-    this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData() as Partial<BetterEditorSettings> | null) };
+    const loaded = await this.loadData() as Partial<BetterEditorSettings> | null;
+    this.settings = {
+      ...DEFAULT_SETTINGS,
+      ...(loaded ?? {}),
+      miniToolbarColors: loaded?.miniToolbarColors ?? {},
+      miniToolbarCopyAction: normalizeToolbarAction(
+        loaded?.miniToolbarCopyAction,
+        DEFAULT_SETTINGS.miniToolbarCopyAction
+      ),
+      miniToolbarStrikethroughAction: normalizeToolbarAction(
+        loaded?.miniToolbarStrikethroughAction,
+        DEFAULT_SETTINGS.miniToolbarStrikethroughAction
+      ),
+      miniToolbarUnderlineAction: normalizeToolbarAction(
+        loaded?.miniToolbarUnderlineAction,
+        DEFAULT_SETTINGS.miniToolbarUnderlineAction
+      )
+    };
   }
 
   private syncFeatureState(): void {
@@ -143,6 +192,15 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
     });
 
     this.tabBar.refresh();
+    this.miniToolbar.refresh();
+  }
+
+  private queuePersistence(): void {
+    if (this.persistHandle !== null) return;
+    this.persistHandle = window.setTimeout(() => {
+      this.persistHandle = null;
+      void this.saveData(this.settings);
+    }, 300);
   }
 
   private syncCommand(id: string, enabled: boolean, register: () => void): void {
