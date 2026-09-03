@@ -246,7 +246,7 @@ export class MiniToolbarFeature {
         if (!textColor && !backgroundColor && !underline) {
           fragments.push(doc.createTextNode(slice));
         } else {
-          const span = doc.createDocumentFragment().createEl("span");
+          const span = createSpan();
           span.setCssStyles({
             color: textColor ?? "",
             backgroundColor: backgroundColor ?? "",
