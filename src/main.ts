@@ -64,8 +64,7 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
     await this.loadSettings();
 
     this.tabBar = new TabBarController(this.app, () => ({
-      enabled: this.settings.tabBarControlsEnabled,
-      hidden: this.settings.hideTabBar,
+      enabled: this.settings.tabBarControlsEnabled && Platform.isDesktopApp,
       autoHideSingleTab: this.settings.autoHideSingleTab,
       gradientHeight: this.settings.tabGradientHeight
     }));
@@ -95,6 +94,12 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
       this.tabBar.refresh();
       this.miniToolbar.scheduleJournalInjection();
     }));
+    this.registerEvent(
+      this.app.workspace.on("window-open", () => this.tabBar.refresh())
+    );
+    this.registerEvent(
+      this.app.workspace.on("window-close", () => this.tabBar.refresh())
+    );
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", this.miniToolbar.scheduleJournalInjection)
     );
@@ -180,10 +185,8 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
       () => {
         this.addCommand({
           id: "toggle-tab-bar-visibility",
-          name: "Toggle tab bar visibility",
-          callback: () => {
-            void this.updateSettings({ hideTabBar: !this.settings.hideTabBar });
-          }
+          name: "Hide/show tab bar",
+          callback: () => this.tabBar.toggle(activeDocument)
         });
       }
     );

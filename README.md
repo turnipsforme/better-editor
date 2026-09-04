@@ -41,7 +41,7 @@ Text colors, highlights, and underlines are stored in Better Editor's local plug
 
 ### Tab bar controls
 
-The desktop-only **Better Editor: Toggle tab bar visibility** command hides or shows the main tab bar. It keeps the editor in the freed space and adds a configurable top gradient behind the window controls. The tab bar can also hide automatically when only one main tab is open.
+The desktop-only **Better Editor: Hide/show tab bar** command hides or shows the main tab bar in the current window. It keeps the editor in the freed space and adds a configurable top gradient behind the window controls. The tab bar can also hide automatically in each window that has only one main tab open.
 
 ### Linked file deletion
 

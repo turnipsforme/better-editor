@@ -22,7 +22,6 @@ export interface BetterEditorSettings {
   linkedFileDeletionEnabled: boolean;
   organizeOnNoteOpen: boolean;
   organizeOnlyDailyNotes: boolean;
-  hideTabBar: boolean;
   autoHideSingleTab: boolean;
   tabGradientHeight: number;
   linkedMentionAction: LinkedMentionAction;
@@ -42,7 +41,6 @@ export const DEFAULT_SETTINGS: BetterEditorSettings = {
   linkedFileDeletionEnabled: true,
   organizeOnNoteOpen: false,
   organizeOnlyDailyNotes: false,
-  hideTabBar: false,
   autoHideSingleTab: false,
   tabGradientHeight: 80,
   linkedMentionAction: "plain-text",
@@ -131,7 +129,7 @@ export class BetterEditorSettingTab extends PluginSettingTab {
       {
         name: "Tab bar controls",
         desc: desktop
-          ? "Adds the tab bar visibility command and automatic single-tab hiding."
+          ? "Adds the Hide/show tab bar command and automatic single-tab hiding."
           : "This feature is available in the desktop app.",
         control: {
           type: "toggle",
