@@ -59,9 +59,12 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
   private fileDeletion!: CurrentFileDeletion;
   private miniToolbar!: MiniToolbarFeature;
   private persistHandle: number | null = null;
+  private unloaded = false;
 
   async onload(): Promise<void> {
+    this.unloaded = false;
     await this.loadSettings();
+    if (this.unloaded) return;
 
     this.tabBar = new TabBarController(this.app, () => ({
       enabled: this.settings.tabBarControlsEnabled && Platform.isDesktopApp,
@@ -90,20 +93,6 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
     );
     this.addSettingTab(new BetterEditorSettingTab(this.app, this));
 
-    this.registerEvent(this.app.workspace.on("layout-change", () => {
-      this.tabBar.refresh();
-      this.miniToolbar.scheduleJournalInjection();
-    }));
-    this.registerEvent(
-      this.app.workspace.on("window-open", () => this.tabBar.refresh())
-    );
-    this.registerEvent(
-      this.app.workspace.on("window-close", () => this.tabBar.refresh())
-    );
-    this.registerEvent(
-      this.app.workspace.on("active-leaf-change", this.miniToolbar.scheduleJournalInjection)
-    );
-    this.app.workspace.onLayoutReady(() => this.miniToolbar.onLayoutReady());
     this.registerMarkdownPostProcessor((element, context) => {
       this.miniToolbar.processReadingView(element, context);
     });
@@ -114,12 +103,33 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
       });
     }));
 
-    this.syncFeatureState();
+    this.syncCommands();
+
+    // Plugins load before Obsidian creates the workspace and restores its views.
+    this.app.workspace.onLayoutReady(() => {
+      if (this.unloaded) return;
+      this.registerEvent(this.app.workspace.on("layout-change", () => {
+        this.tabBar.refresh();
+        this.miniToolbar.scheduleJournalInjection();
+      }));
+      this.registerEvent(
+        this.app.workspace.on("window-open", () => this.tabBar.refresh())
+      );
+      this.registerEvent(
+        this.app.workspace.on("window-close", () => this.tabBar.refresh())
+      );
+      this.registerEvent(
+        this.app.workspace.on("active-leaf-change", this.miniToolbar.scheduleJournalInjection)
+      );
+      this.tabBar.refresh();
+      this.miniToolbar.refresh();
+    });
   }
 
   onunload(): void {
-    this.tabBar.destroy();
-    this.miniToolbar.destroy();
+    this.unloaded = true;
+    this.tabBar?.destroy();
+    this.miniToolbar?.destroy();
     if (this.persistHandle !== null) {
       window.clearTimeout(this.persistHandle);
       this.persistHandle = null;
@@ -130,7 +140,11 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
   async updateSettings(changes: Partial<BetterEditorSettings>): Promise<void> {
     this.settings = { ...this.settings, ...changes };
     await this.saveData(this.settings);
-    this.syncFeatureState();
+    this.syncCommands();
+    if (this.app.workspace.layoutReady && !this.unloaded) {
+      this.tabBar.refresh();
+      this.miniToolbar.refresh();
+    }
   }
 
   private async loadSettings(): Promise<void> {
@@ -154,7 +168,7 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
     };
   }
 
-  private syncFeatureState(): void {
+  private syncCommands(): void {
     this.syncCommand("move-website-links", this.settings.websiteLinkFilingEnabled, () => {
       this.addCommand({
         id: "move-website-links",
@@ -203,9 +217,6 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
         }
       });
     });
-
-    this.tabBar.refresh();
-    this.miniToolbar.refresh();
   }
 
   private queuePersistence(): void {

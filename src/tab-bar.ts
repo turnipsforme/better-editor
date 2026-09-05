@@ -21,6 +21,7 @@ export class TabBarController {
       this.clearStyles();
       return;
     }
+    if (!this.app.workspace.layoutReady || !this.app.workspace.rootSplit) return;
 
     const tabCounts = this.getTabCounts();
     for (const doc of this.styledDocuments) {
@@ -35,6 +36,7 @@ export class TabBarController {
   toggle(doc: Document): void {
     const options = this.getOptions();
     if (!options.enabled) return;
+    if (!this.app.workspace.layoutReady || !this.app.workspace.rootSplit) return;
 
     const tabCount = this.getTabCounts().get(doc) ?? 0;
     const currentlyHidden = this.shouldHide(doc, tabCount, options);

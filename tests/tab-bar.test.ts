@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { App, WorkspaceLeaf } from "obsidian";
 import { TabBarController, type TabBarOptions } from "../src/tab-bar";
 
@@ -34,6 +34,7 @@ const createDocument = (): FakeDocument => {
 
 const createApp = (rootDocument: Document, documents: Document[]): App => ({
   workspace: {
+    layoutReady: true,
     rootSplit: { doc: rootDocument },
     iterateRootLeaves: (callback: (leaf: WorkspaceLeaf) => unknown) => {
       for (const doc of documents) {
@@ -44,6 +45,44 @@ const createApp = (rootDocument: Document, documents: Document[]): App => ({
 } as unknown as App);
 
 describe("TabBarController", () => {
+  it("ignores refresh and toggle before the workspace is ready", () => {
+    const { doc, classes, styles } = createDocument();
+    const app = createApp(doc, [doc]);
+    app.workspace.layoutReady = false;
+    const iterateLeaves = vi.spyOn(app.workspace, "iterateRootLeaves");
+    const controller = new TabBarController(app, () => ({
+      enabled: true,
+      autoHideSingleTab: true,
+      gradientHeight: 80,
+    }));
+
+    controller.refresh();
+    controller.toggle(doc);
+    expect(iterateLeaves).not.toHaveBeenCalled();
+    expect(styles.size).toBe(0);
+
+    app.workspace.layoutReady = true;
+    controller.refresh();
+    expect(classes.has("better-editor-hide-tabs")).toBe(true);
+    expect(styles.get("--better-editor-tab-gradient-height")).toBe("80px");
+  });
+
+  it("handles a missing workspace root and can still remove its styles", () => {
+    const { doc, styles } = createDocument();
+    const app = createApp(doc, [doc]);
+    const options = { enabled: true, autoHideSingleTab: true, gradientHeight: 80 };
+    const controller = new TabBarController(app, () => options);
+    controller.refresh();
+    // The runtime can clear the root while replacing the workspace layout.
+    Object.assign(app.workspace, { rootSplit: null });
+
+    expect(() => controller.refresh()).not.toThrow();
+    expect(() => controller.toggle(doc)).not.toThrow();
+    options.enabled = false;
+    controller.refresh();
+    expect(styles.size).toBe(0);
+  });
+
   it("auto-hides only the window with one tab", () => {
     const first = createDocument();
     const second = createDocument();

@@ -109,10 +109,6 @@ export class MiniToolbarFeature {
     }, 150);
   };
 
-  onLayoutReady(): void {
-    if (this.getOptions().enabled) this.injectIntoJournalEditors();
-  }
-
   refresh(): void {
     if (this.getOptions().enabled) {
       this.injectIntoJournalEditors();

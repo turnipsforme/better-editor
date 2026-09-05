@@ -70,6 +70,10 @@ Copy `main.js`, `manifest.json`, and `styles.css` into:
 
 Then reload Obsidian and enable **Better Editor**.
 
+## Latest release: 1.1.4
+
+Fixes a brief "failed to load" error when Obsidian starts. Tab controls and toolbar refreshes now wait for the workspace to finish opening. Disabling the plugin during startup also cancels its pending setup.
+
 ## Development
 
 ```sh
