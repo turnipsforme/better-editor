@@ -140,6 +140,10 @@ export class MiniToolbarFeature {
   }
 
   private injectIntoJournalEditors(): void {
+    if (!this.getOptions().enabled) return;
+    for (const view of this.journalEditors) {
+      if (!view.dom.isConnected) this.journalEditors.delete(view);
+    }
     try {
       this.forEachJournalEditor((view) => {
         if (view.state.field(miniToolbarMarkerField, false) !== undefined) return;

@@ -12,8 +12,14 @@ export interface OrganizeNoteResult {
   removedEmptyLineCount: number;
 }
 
+export type EmptyLineMode = "remove" | "collapse" | "keep";
+
 export interface OrganizeNoteOptions {
+  emptyLines?: EmptyLineMode;
   organizeWebsiteLinks?: boolean;
+  moveTasks?: boolean;
+  moveNotes?: boolean;
+  addBullets?: boolean;
 }
 
 interface Span {
@@ -107,65 +113,36 @@ function findWebsiteLinks(line: string): Span[] {
   return links;
 }
 
-function sectionBounds(lines: string[]): { start: number; end: number } | null {
-  const start = lines.findIndex((line) => linksHeader.test(line));
-  if (start === -1) return null;
-
-  let end = start + 1;
-  while (end < lines.length && (lines[end].trim() === "" || /^\s+/.test(lines[end]))) end++;
-  return { start, end };
-}
-
-export function moveWebsiteLinks(text: string): MoveLinksResult {
+export function moveWebsiteLinks(text: string, keepEmptyLines = false): MoveLinksResult {
   const eol = text.includes("\r\n") ? "\r\n" : "\n";
   const hadFinalEol = text.endsWith("\n");
   const lines = text.split(/\r?\n/);
   if (hadFinalEol) lines.pop();
 
-  const originalSection = sectionBounds(lines);
+  const protectedLine = protectedLines(lines);
+  const originalSections = sectionMask(lines.length, findLinksSections(lines, protectedLine));
   const moved: string[] = [];
   const remaining: string[] = [];
-  let fencedCodeMarker: string | null = null;
-
   lines.forEach((line, lineIndex) => {
-    const fence = line.match(/^\s*(`{3,}|~{3,})/);
-    const isFenceLine = fence !== null;
-    const inFencedCode = fencedCodeMarker !== null || isFenceLine;
-    if (fence) {
-      const marker = fence[1][0];
-      if (fencedCodeMarker === marker) fencedCodeMarker = null;
-      else if (fencedCodeMarker === null) fencedCodeMarker = marker;
-    }
-    const inLinksSection = originalSection !== null
-      && lineIndex >= originalSection.start
-      && lineIndex < originalSection.end;
-    const foundSpans = inLinksSection || inFencedCode ? [] : findWebsiteLinks(line);
+    const safeToMove = !protectedLine[lineIndex]
+      && !originalSections[lineIndex]
+      && !/^[ \t]/.test(line);
+    const foundSpans = safeToMove ? findWebsiteLinks(line) : [];
     const span = foundSpans.length === 1 ? foundSpans[0] : null;
     const prefix = span ? line.slice(0, span.start) : "";
     const suffix = span ? line.slice(span.end) : "";
-    const spans = span
-      && /^\s*(?:(?:[-+*]|\d+[.)])\s+)?$/.test(prefix)
-      && /^\s*$/.test(suffix)
-      ? [span]
-      : [];
-
-    if (spans.length === 0) {
+    if (!span || !/^(?:(?:[-+*]|\d+[.)])\s+)?$/.test(prefix) || !/^\s*$/.test(suffix)
+      || blockEnd(lines, lineIndex, 0) !== lineIndex + 1) {
       remaining.push(line);
       return;
     }
 
-    moved.push(...spans.map((span) => span.bare ? `[](${span.text})` : span.text));
-    let residue = line;
-    for (let i = spans.length - 1; i >= 0; i--) {
-      residue = residue.slice(0, spans[i].start) + residue.slice(spans[i].end);
-    }
-
-    if (residue.trim() !== "" && !/^\s*(?:[-+*]|\d+[.)])\s*$/.test(residue)) remaining.push(residue);
+    moved.push(span.bare ? `[](${span.text})` : span.text);
   });
 
   if (moved.length === 0) return { text, movedCount: 0 };
 
-  const section = sectionBounds(remaining);
+  const section = findLinksSections(remaining, protectedLines(remaining))[0];
   if (section) {
     let insertAt = section.end;
     while (insertAt > section.start + 1 && remaining[insertAt - 1].trim() === "") insertAt--;
@@ -180,8 +157,10 @@ export function moveWebsiteLinks(text: string): MoveLinksResult {
     const movedLines = moved.map((link) => `${indent}- ${link}`);
     remaining.splice(insertAt, 0, ...movedLines);
   } else {
-    while (remaining.length > 0 && remaining[remaining.length - 1].trim() === "") remaining.pop();
-    if (remaining.length > 0) remaining.push("");
+    if (!keepEmptyLines) {
+      while (remaining.length > 0 && remaining[remaining.length - 1].trim() === "") remaining.pop();
+    }
+    if (remaining.length > 0 && remaining[remaining.length - 1].trim() !== "") remaining.push("");
     const movedLines = moved.map((link) => `  - ${link}`);
     remaining.push("- [[Links]]", ...movedLines);
   }
@@ -219,51 +198,63 @@ function headingType(line: string): OrganizeSectionType | null {
   return matchedTypes.length === 1 ? matchedTypes[0] : null;
 }
 
-function fencedCodeLines(lines: string[]): boolean[] {
-  const inFencedCode: boolean[] = [];
-  let marker: string | null = null;
-
-  lines.forEach((line, index) => {
-    const fence = line.match(/^\s*(`{3,}|~{3,})/);
-    inFencedCode[index] = marker !== null || fence !== null;
-
-    if (!fence) return;
-    const fenceMarker = fence[1][0];
-    if (marker === fenceMarker) marker = null;
-    else if (marker === null) marker = fenceMarker;
-  });
-
-  return inFencedCode;
-}
-
-function frontmatterLines(lines: string[]): boolean[] {
-  const protectedLines = lines.map(() => false);
-  if (lines[0] !== "---") return protectedLines;
-
-  for (let index = 0; index < lines.length; index++) {
-    protectedLines[index] = true;
-    if (index > 0 && (lines[index] === "---" || lines[index] === "...")) break;
-  }
-  return protectedLines;
-}
-
+/** Protect literal blocks before any pass, including link filing. */
 function protectedLines(lines: string[]): boolean[] {
-  const fenced = fencedCodeLines(lines);
-  const frontmatter = frontmatterLines(lines);
-  return lines.map((_, index) => fenced[index] || frontmatter[index]);
+  const protectedLine = lines.map(() => false);
+  let frontmatter = lines[0] === "---";
+  let fence: { marker: string; length: number } | null = null;
+  let comment = false;
+  let math = false;
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    if (frontmatter) {
+      protectedLine[index] = true;
+      if (index > 0 && /^(?:---|\.\.\.)\s*$/.test(line)) frontmatter = false;
+      continue;
+    }
+    if (fence) {
+      protectedLine[index] = true;
+      const close = line.match(/^\s*(`{3,}|~{3,})\s*$/);
+      if (close && close[1][0] === fence.marker && close[1].length >= fence.length) fence = null;
+      continue;
+    }
+    if (comment || line.includes("<!--")) {
+      protectedLine[index] = true;
+      if (line.lastIndexOf("<!--") > line.lastIndexOf("-->")) comment = true;
+      else if (line.includes("-->")) comment = false;
+      continue;
+    }
+    if (math || /^\s*\$\$/.test(line)) {
+      protectedLine[index] = true;
+      if (math) math = !line.includes("$$");
+      else math = !line.trimStart().slice(2).includes("$$");
+      continue;
+    }
+    const open = line.match(/^\s*(`{3,}|~{3,})(.*)$/);
+    if (open && !(open[1][0] === "`" && open[2].includes("`"))) {
+      protectedLine[index] = true;
+      fence = { marker: open[1][0], length: open[1].length };
+    }
+    // A setext heading's text and underline must stay together.
+    if (index > 0 && /^ {0,3}(?:=+|-+)\s*$/.test(line) && lines[index - 1].trim()) {
+      protectedLine[index - 1] = protectedLine[index] = true;
+    }
+  }
+  return protectedLine;
 }
 
-function removeEmptyLines(lines: string[]): { lines: string[]; removedCount: number } {
+function removeEmptyLines(lines: string[], mode: EmptyLineMode): { lines: string[]; removedCount: number } {
+  if (mode === "keep") return { lines, removedCount: 0 };
   const protectedLine = protectedLines(lines);
   const compacted: string[] = [];
   let removedCount = 0;
+  let previousEmpty = false;
 
   lines.forEach((line, index) => {
-    if (!protectedLine[index] && line.trim() === "") {
-      removedCount++;
-      return;
-    }
-    compacted.push(line);
+    const empty = !protectedLine[index] && line.trim() === "";
+    if (empty && (mode === "remove" || previousEmpty)) removedCount++;
+    else compacted.push(line);
+    previousEmpty = empty;
   });
 
   return { lines: compacted, removedCount };
@@ -279,16 +270,20 @@ function findOrganizeSections(lines: string[], protectedLine: boolean[]): Organi
     headings.push({ index, level: match[1].length, type: headingType(line) });
   });
 
-  return headings
-    .filter((heading): heading is { index: number; level: number; type: OrganizeSectionType } => heading.type !== null)
-    .map((heading) => {
-      const nextBoundary = headings.find((other) => other.index > heading.index && other.level <= heading.level);
-      return {
-        type: heading.type,
-        start: heading.index,
-        end: nextBoundary ? nextBoundary.index : lines.length
-      };
-    });
+  // Each heading is visited once, even in notes with thousands of sections.
+  const sections: OrganizeSection[] = [];
+  const stack: Array<{ level: number; section: OrganizeSection }> = [];
+  for (const heading of headings) {
+    while (stack.length && stack[stack.length - 1].level >= heading.level) {
+      stack.pop()!.section.end = heading.index;
+    }
+    if (heading.type) {
+      const section = { type: heading.type, start: heading.index, end: lines.length };
+      sections.push(section);
+      stack.push({ level: heading.level, section });
+    }
+  }
+  return sections;
 }
 
 function findLinksSections(lines: string[], protectedLine: boolean[]): Array<{ start: number; end: number }> {
@@ -306,32 +301,21 @@ function findLinksSections(lines: string[], protectedLine: boolean[]): Array<{ s
   return sections;
 }
 
-function isInSection(index: number, sections: Array<{ start: number; end: number }>): boolean {
-  return sections.some((section) => index >= section.start && index < section.end);
+function sectionMask(length: number, sections: Array<{ start: number; end: number }>): boolean[] {
+  const mask = Array<boolean>(length).fill(false);
+  for (const section of sections) mask.fill(true, section.start, section.end);
+  return mask;
 }
 
 function taskBlockEnd(lines: string[], start: number): number {
   const match = lines[start].match(taskItem);
   if (!match) return start + 1;
 
-  const baseIndentLength = match[1].length;
-  let end = start + 1;
-  while (end < lines.length) {
-    const line = lines[end];
-    if (line.trim() === "") {
-      end++;
-      continue;
-    }
-
-    const indent = line.match(/^[ \t]*/)?.[0].length ?? 0;
-    if (indent <= baseIndentLength) break;
-    end++;
-  }
-  return end;
+  return blockEnd(lines, start, match[1].length);
 }
 
 function isStructuralMarkdown(line: string): boolean {
-  return /^\s*(?:#{1,6}\s|>|\||<!--|<\/?[A-Za-z][^>]*>|\[\^[^\]]+\]:|\$\$|(?:-{3,}|\*{3,}|_{3,})\s*$)/.test(line);
+  return /^\s*(?:#{1,6}\s|>|\||<!--|<\/?[A-Za-z][^>]*>|\[[^\]]+\]:|\$\$|(?:-{3,}|\*{3,}|_{3,})\s*$)/.test(line);
 }
 
 function isMovableNoteLine(lines: string[], index: number): boolean {
@@ -342,21 +326,22 @@ function isMovableNoteLine(lines: string[], index: number): boolean {
   const listMatch = line.match(listItem);
   // Moving or converting a parent line without its indented children can
   // detach data (including indented code), so leave those blocks untouched.
-  const end = taskBlockEndForList(lines, index, listMatch ? listMatch[1].length : 0);
+  const end = blockEnd(lines, index, listMatch ? listMatch[1].length : 0);
   return end === index + 1;
 }
 
-function taskBlockEndForList(lines: string[], start: number, baseIndentLength: number): number {
+function blockEnd(lines: string[], start: number, baseIndentLength: number): number {
   let end = start + 1;
-  while (end < lines.length) {
-    const line = lines[end];
+  let pending = end;
+  while (pending < lines.length) {
+    const line = lines[pending];
     if (line.trim() === "") {
-      end++;
+      pending++;
       continue;
     }
     const indent = line.match(/^[ \t]*/)?.[0].length ?? 0;
     if (indent <= baseIndentLength) break;
-    end++;
+    end = ++pending;
   }
   return end;
 }
@@ -387,31 +372,34 @@ export function organizeCurrentNote(
 ): OrganizeNoteResult {
   const linkResult = options.organizeWebsiteLinks === false
     ? { text, movedCount: 0 }
-    : moveWebsiteLinks(text);
+    : moveWebsiteLinks(text, options.emptyLines === "keep" || options.emptyLines === "collapse");
   const eol = linkResult.text.includes("\r\n") ? "\r\n" : "\n";
   const hadFinalEol = linkResult.text.endsWith("\n");
   const initialLines = linkResult.text.split(/\r?\n/);
   if (hadFinalEol) initialLines.pop();
 
-  const compacted = removeEmptyLines(initialLines);
+  const compacted = removeEmptyLines(initialLines, options.emptyLines ?? "remove");
   const lines = compacted.lines;
   const protectedLine = protectedLines(lines);
   const organizeSections = findOrganizeSections(lines, protectedLine);
   const taskSections = organizeSections.filter((section) => section.type === "tasks");
   const notesSections = organizeSections.filter((section) => section.type === "notes");
   const linksSections = findLinksSections(lines, protectedLine);
+  const taskSectionLines = sectionMask(lines.length, taskSections);
+  const notesSectionLines = sectionMask(lines.length, notesSections);
+  const linksSectionLines = sectionMask(lines.length, linksSections);
   const taskTarget = taskSections[0];
   const notesTarget = notesSections[0];
 
   const taskIndexes = new Set<number>();
   const taskBlocks: TaskBlock[] = [];
-  if (taskTarget) {
+  if (options.moveTasks !== false && taskTarget) {
     for (let index = 0; index < lines.length; index++) {
       const match = !protectedLine[index] ? lines[index].match(taskItem) : null;
       // A top-level task can be moved with all of its indented Markdown
       // children. Indented tasks may belong to a parent elsewhere, so retain
       // them in place rather than risking an orphaned subtree.
-      if (!match || match[1] !== "" || isInSection(index, taskSections) || isInSection(index, linksSections)) continue;
+      if (!match || match[1] !== "" || taskSectionLines[index] || linksSectionLines[index]) continue;
 
       const end = taskBlockEnd(lines, index);
       const blockLines = lines.slice(index, end);
@@ -428,14 +416,14 @@ export function organizeCurrentNote(
   let bulletAddedCount = 0;
 
   for (let index = 0; index < lines.length; index++) {
-    if (taskIndexes.has(index) || protectedLine[index] || isInSection(index, linksSections)) continue;
+    if (taskIndexes.has(index) || protectedLine[index] || linksSectionLines[index]) continue;
     if (headingType(lines[index]) !== null || markdownHeading.test(lines[index])) continue;
     if (!isMovableNoteLine(lines, index)) continue;
 
-    const bulleted = addBullet(lines[index]);
+    const bulleted = options.addBullets === false ? lines[index] : addBullet(lines[index]);
     if (bulleted !== lines[index]) bulletAddedCount++;
 
-    if (isInSection(index, notesSections) || !notesTarget) {
+    if (options.moveNotes === false || notesSectionLines[index] || !notesTarget) {
       lines[index] = bulleted;
     } else {
       movedNotes.push(bulleted);
@@ -458,7 +446,8 @@ export function organizeCurrentNote(
           break;
         }
       }
-      const flattenedTasks = taskBlocks.reduce<string[]>((all, block) => all.concat(block.lines), []);
+      const flattenedTasks: string[] = [];
+      for (const block of taskBlocks) for (const line of block.lines) flattenedTasks.push(line);
       remaining.splice(insertAt, 0, ...flattenedTasks);
     }
   }
@@ -473,12 +462,16 @@ export function organizeCurrentNote(
     }
   }
 
+  // Moving a line can join two previously separate runs of blank lines.
+  const finalCompacted = options.emptyLines === "collapse"
+    ? removeEmptyLines(remaining, "collapse")
+    : { lines: remaining, removedCount: 0 };
   return {
-    text: joinLines(remaining, eol, hadFinalEol),
+    text: joinLines(finalCompacted.lines, eol, hadFinalEol),
     movedLinkCount: linkResult.movedCount,
     movedTaskCount: taskBlocks.length,
     movedNoteCount: movedNotes.length,
     bulletAddedCount,
-    removedEmptyLineCount: compacted.removedCount
+    removedEmptyLineCount: compacted.removedCount + finalCompacted.removedCount
   };
 }

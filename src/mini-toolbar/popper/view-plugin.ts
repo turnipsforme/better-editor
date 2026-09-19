@@ -113,9 +113,9 @@ class ViewPluginClass implements PluginValue {
     const info = input ?? this.tooltipInfo;
     if (!info) return;
     this.removeToolbar();
-    let toolbar = info.create(this.containerEl);
     const view = this.view.state.field(editorInfoField);
-    if (!view || !view?.editor) return;
+    if (!view?.editor) return;
+    const toolbar = info.create(this.containerEl);
     const from = view.editor.offsetToPos(info.start);
     const to = info.end ? view.editor.offsetToPos(info.end) : from;
     this.workspace.trigger(
@@ -197,7 +197,8 @@ class ViewPluginClass implements PluginValue {
     if (this.embedded || !this.toolbar) return;
     this.virtualEl.rect = refRect;
     const { padding } = this.view.state.facet(tooltipConfig);
-    const { x, y } = await computePosition(this.virtualEl, this.toolbar.dom, {
+    const toolbar = this.toolbar;
+    const { x, y } = await computePosition(this.virtualEl, toolbar.dom, {
       placement: this.defaultPlacement,
       middleware: [
         offset({ mainAxis: 5 }),
@@ -205,7 +206,8 @@ class ViewPluginClass implements PluginValue {
         shift({ padding, boundary: this.view.scrollDOM }),
       ],
     });
-    Object.assign(this.toolbar.dom.style, {
+    if (this.toolbar !== toolbar) return;
+    Object.assign(toolbar.dom.style, {
       top: "0",
       left: "0",
       transform: `translate(${Math.round(x)}px,${Math.round(y)}px)`,

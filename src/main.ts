@@ -16,6 +16,7 @@ import { moveWebsiteLinks, organizeCurrentNote } from "./note-organizer";
 import {
   BetterEditorSettingTab,
   DEFAULT_SETTINGS,
+  organizerOptions,
   type BetterEditorSettings,
   type SettingsHost
 } from "./settings";
@@ -140,10 +141,15 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
   async updateSettings(changes: Partial<BetterEditorSettings>): Promise<void> {
     this.settings = { ...this.settings, ...changes };
     await this.saveData(this.settings);
+    if (this.unloaded) return;
     this.syncCommands();
-    if (this.app.workspace.layoutReady && !this.unloaded) {
-      this.tabBar.refresh();
-      this.miniToolbar.refresh();
+    if (this.app.workspace.layoutReady) {
+      if (["tabBarControlsEnabled", "autoHideSingleTab", "tabGradientHeight"].some((key) => key in changes)) {
+        this.tabBar.refresh();
+      }
+      if (Object.keys(changes).some((key) => key.startsWith("miniToolbar"))) {
+        this.miniToolbar.refresh();
+      }
     }
   }
 
@@ -252,9 +258,7 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
 
   private organizeEditor(editor: Editor, showNotice: boolean): void {
     const originalText = editor.getValue();
-    const result = organizeCurrentNote(originalText, {
-      organizeWebsiteLinks: this.settings.websiteLinkFilingEnabled
-    });
+    const result = organizeCurrentNote(originalText, organizerOptions(this.settings, !showNotice));
     if (result.text === originalText) {
       if (showNotice) new Notice("Current note is already organized.");
       return;
@@ -286,15 +290,17 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
 
   private replaceEditorText(editor: Editor, text: string): void {
     const cursor = editor.getCursor();
-    editor.setValue(text);
+    // A normal edit stays in Obsidian's undo history.
+    const lastLine = editor.lineCount() - 1;
+    editor.replaceRange(text, { line: 0, ch: 0 }, { line: lastLine, ch: editor.getLine(lastLine).length });
     editor.setCursor({
       line: Math.min(cursor.line, editor.lineCount() - 1),
-      ch: cursor.ch
+      ch: Math.min(cursor.ch, editor.getLine(Math.min(cursor.line, editor.lineCount() - 1)).length)
     });
   }
 
   private async organizeNoteOnOpen(file: TFile): Promise<void> {
-    if (!this.settings.noteOrganizerEnabled
+    if (this.unloaded || !this.settings.noteOrganizerEnabled
       || !this.settings.organizeOnNoteOpen
       || file.extension !== "md") return;
     if (this.settings.organizeOnlyDailyNotes && !this.isDailyNote(file)) return;
@@ -305,9 +311,11 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
       return;
     }
 
-    await this.app.vault.process(file, (text) => organizeCurrentNote(text, {
-      organizeWebsiteLinks: this.settings.websiteLinkFilingEnabled
-    }).text);
+    await this.app.vault.process(file, (text) => {
+      if (this.unloaded || !this.settings.noteOrganizerEnabled || !this.settings.organizeOnNoteOpen) return text;
+      if (this.settings.organizeOnlyDailyNotes && !this.isDailyNote(file)) return text;
+      return organizeCurrentNote(text, organizerOptions(this.settings, true)).text;
+    });
   }
 
   private isDailyNote(file: TFile): boolean {

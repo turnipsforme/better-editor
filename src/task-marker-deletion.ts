@@ -1,5 +1,5 @@
 import { EditorSelection, Prec, Transaction, type Extension } from "@codemirror/state";
-import { EditorView, keymap, type ViewUpdate } from "@codemirror/view";
+import { EditorView, keymap } from "@codemirror/view";
 
 const TASK_MARKER = /^(?<bullet>\s*-\s\[(?<mark>[ xX])\]\s)/;
 
@@ -42,39 +42,8 @@ function removeTaskMarker(view: EditorView, backward: boolean): boolean {
   if (changes.length === 0) return false;
   view.dispatch({
     changes,
-    selection: EditorSelection.create(ranges),
+    selection: EditorSelection.create(ranges).map(view.state.changes(changes)),
     userEvent: backward ? "delete.backward" : "delete.forward",
-    annotations: Transaction.addToHistory.of(true),
-    scrollIntoView: true
-  });
-  return true;
-}
-
-function finishTaskMarkerDeletion(view: EditorView, changes: ViewUpdate["changes"]): boolean {
-  if (view.state.facet(EditorView.editable) !== true || view.composing) return false;
-
-  const removals: RemovalRange[] = [];
-  const ranges = [];
-  for (const selectionRange of view.state.selection.ranges) {
-    if (!selectionRange.empty) return false;
-
-    const line = view.state.doc.lineAt(selectionRange.head);
-    const match = line.text.match(TASK_MARKER);
-    if (!match || match.index !== 0) return false;
-
-    const prefixEnd = line.from + match[0].length;
-    const trailingSpaceFrom = prefixEnd - 1;
-    if (changes.touchesRange(trailingSpaceFrom, prefixEnd) !== "cover") return false;
-
-    removals.push({ from: line.from, to: trailingSpaceFrom });
-    ranges.push(EditorSelection.cursor(line.from));
-  }
-
-  if (removals.length === 0) return false;
-  view.dispatch({
-    changes: removals,
-    selection: EditorSelection.create(ranges),
-    userEvent: "delete.backward",
     annotations: Transaction.addToHistory.of(true),
     scrollIntoView: true
   });
@@ -93,15 +62,5 @@ export function createTaskMarkerDeletionExtensions(isEnabled: () => boolean): Ex
     }
   ]));
 
-  const deletionObserver = EditorView.updateListener.of((update) => {
-    if (!isEnabled() || !update.docChanged
-      || !update.transactions.some((transaction) => transaction.isUserEvent("delete"))) return;
-
-    for (const transaction of update.transactions) {
-      if (!transaction.docChanged || transaction.annotation(Transaction.addToHistory) === false) continue;
-      if (finishTaskMarkerDeletion(update.view, transaction.changes)) break;
-    }
-  });
-
-  return [taskMarkerKeymap, deletionObserver];
+  return [taskMarkerKeymap];
 }

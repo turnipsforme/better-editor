@@ -4,7 +4,9 @@ import {
   Plugin,
   PluginSettingTab,
   type SettingDefinitionItem,
+  type SettingGroupItem,
 } from "obsidian";
+import type { EmptyLineMode, OrganizeNoteOptions } from "./note-organizer";
 import type { LinkedMentionAction } from "./link-cleanup";
 import type { FileColorData } from "./mini-toolbar/colorRanges";
 import {
@@ -20,6 +22,16 @@ export interface BetterEditorSettings {
   miniToolbarEnabled: boolean;
   tabBarControlsEnabled: boolean;
   linkedFileDeletionEnabled: boolean;
+  manualEmptyLines: EmptyLineMode;
+  manualMoveLinks: boolean;
+  manualMoveTasks: boolean;
+  manualMoveNotes: boolean;
+  manualAddBullets: boolean;
+  automaticEmptyLines: EmptyLineMode;
+  automaticMoveLinks: boolean;
+  automaticMoveTasks: boolean;
+  automaticMoveNotes: boolean;
+  automaticAddBullets: boolean;
   organizeOnNoteOpen: boolean;
   organizeOnlyDailyNotes: boolean;
   autoHideSingleTab: boolean;
@@ -39,6 +51,16 @@ export const DEFAULT_SETTINGS: BetterEditorSettings = {
   miniToolbarEnabled: true,
   tabBarControlsEnabled: true,
   linkedFileDeletionEnabled: true,
+  manualEmptyLines: "remove",
+  manualMoveLinks: true,
+  manualMoveTasks: true,
+  manualMoveNotes: true,
+  manualAddBullets: true,
+  automaticEmptyLines: "remove",
+  automaticMoveLinks: true,
+  automaticMoveTasks: true,
+  automaticMoveNotes: true,
+  automaticAddBullets: true,
   organizeOnNoteOpen: false,
   organizeOnlyDailyNotes: false,
   autoHideSingleTab: false,
@@ -50,6 +72,17 @@ export const DEFAULT_SETTINGS: BetterEditorSettings = {
   miniToolbarUnderlineAction: DEFAULT_TOOLBAR_SETTINGS.underlineButtonAction,
   miniToolbarColors: {},
 };
+
+export function organizerOptions(settings: BetterEditorSettings, automatic: boolean): OrganizeNoteOptions {
+  const prefix = automatic ? "automatic" : "manual";
+  return {
+    emptyLines: settings[`${prefix}EmptyLines`],
+    organizeWebsiteLinks: settings.websiteLinkFilingEnabled && settings[`${prefix}MoveLinks`],
+    moveTasks: settings[`${prefix}MoveTasks`],
+    moveNotes: settings[`${prefix}MoveNotes`],
+    addBullets: settings[`${prefix}AddBullets`],
+  };
+}
 
 export interface SettingsHost {
   settings: BetterEditorSettings;
@@ -79,20 +112,54 @@ export class BetterEditorSettingTab extends PluginSettingTab {
 
     return [
       {
+        name: "Note organizer",
+        desc: "Enable the Organize current note command and optional automatic organization.",
+        control: {
+          type: "toggle",
+          key: "noteOrganizerEnabled",
+          defaultValue: true,
+        },
+      },
+      {
+        type: "group",
+        heading: "Manual organization",
+        items: this.organizerControls("manual"),
+      },
+      {
+        type: "group",
+        heading: "Automatic organization",
+        items: [
+          {
+            name: "Organize notes when opened",
+            desc: "Use the automatic options below whenever a Markdown note is opened.",
+            control: {
+              type: "toggle",
+              key: "organizeOnNoteOpen",
+              defaultValue: false,
+              disabled: () => !this.plugin.settings.noteOrganizerEnabled,
+            },
+          },
+          {
+            name: "Only daily notes",
+            desc: "Limit automatic organization to notes matching the Daily notes folder and date format.",
+            control: {
+              type: "toggle",
+              key: "organizeOnlyDailyNotes",
+              defaultValue: false,
+              disabled: () =>
+                !this.plugin.settings.noteOrganizerEnabled ||
+                !this.plugin.settings.organizeOnNoteOpen,
+            },
+          },
+          ...this.organizerControls("automatic"),
+        ],
+      },
+      {
         name: "Website link filing",
         desc: "Adds the command that moves standalone website links into the note's Links list.",
         control: {
           type: "toggle",
           key: "websiteLinkFilingEnabled",
-          defaultValue: true,
-        },
-      },
-      {
-        name: "Note organizer",
-        desc: "Adds manual and automatic note organization for notes, tasks, blank lines, and enabled website link filing.",
-        control: {
-          type: "toggle",
-          key: "noteOrganizerEnabled",
           defaultValue: true,
         },
       },
@@ -125,75 +192,6 @@ export class BetterEditorSettingTab extends PluginSettingTab {
           defaultValue: true,
           disabled: !desktop,
         },
-      },
-      {
-        name: "Tab bar controls",
-        desc: desktop
-          ? "Adds the Hide/show tab bar command and automatic single-tab hiding."
-          : "This feature is available in the desktop app.",
-        control: {
-          type: "toggle",
-          key: "tabBarControlsEnabled",
-          defaultValue: true,
-          disabled: !desktop,
-        },
-      },
-      {
-        name: "Linked file deletion",
-        desc: "Adds a delete-current-file command that cleans links to the file before moving it to your configured trash.",
-        control: {
-          type: "toggle",
-          key: "linkedFileDeletionEnabled",
-          defaultValue: true,
-        },
-      },
-      {
-        type: "group",
-        heading: "Note organization",
-        items: [
-          {
-            name: "Organize notes when opened",
-            desc: "Automatically run Organize current note whenever a Markdown note is opened.",
-            control: {
-              type: "toggle",
-              key: "organizeOnNoteOpen",
-              defaultValue: false,
-              disabled: () => !this.plugin.settings.noteOrganizerEnabled,
-            },
-          },
-          {
-            name: "Only daily notes",
-            desc: "Limit automatic organization to notes matching the Daily notes folder and date format.",
-            control: {
-              type: "toggle",
-              key: "organizeOnlyDailyNotes",
-              defaultValue: false,
-              disabled: () =>
-                !this.plugin.settings.noteOrganizerEnabled ||
-                !this.plugin.settings.organizeOnNoteOpen,
-            },
-          },
-        ],
-      },
-      {
-        type: "group",
-        heading: "Linked file deletion",
-        items: [
-          {
-            name: "Linked mentions",
-            desc: "Choose what replaces links to the file when Delete current file is used.",
-            control: {
-              type: "dropdown",
-              key: "linkedMentionAction",
-              options: {
-                "plain-text": "Keep their display text",
-                remove: "Remove them completely",
-              },
-              defaultValue: "plain-text",
-              disabled: () => !this.plugin.settings.linkedFileDeletionEnabled,
-            },
-          },
-        ],
       },
       {
         type: "group",
@@ -248,6 +246,18 @@ export class BetterEditorSettingTab extends PluginSettingTab {
         ],
       },
       {
+        name: "Tab bar controls",
+        desc: desktop
+          ? "Adds the Hide/show tab bar command and automatic single-tab hiding."
+          : "This feature is available in the desktop app.",
+        control: {
+          type: "toggle",
+          key: "tabBarControlsEnabled",
+          defaultValue: true,
+          disabled: !desktop,
+        },
+      },
+      {
         type: "group",
         heading: "Tab bar",
         items: [
@@ -277,6 +287,76 @@ export class BetterEditorSettingTab extends PluginSettingTab {
             },
           },
         ],
+      },
+      {
+        name: "Linked file deletion",
+        desc: "Adds a delete-current-file command that cleans links to the file before moving it to your configured trash.",
+        control: {
+          type: "toggle",
+          key: "linkedFileDeletionEnabled",
+          defaultValue: true,
+        },
+      },
+      {
+        type: "group",
+        heading: "Linked file deletion",
+        items: [
+          {
+            name: "Linked mentions",
+            desc: "Choose what replaces links to the file when Delete current file is used.",
+            control: {
+              type: "dropdown",
+              key: "linkedMentionAction",
+              options: {
+                "plain-text": "Keep their display text",
+                remove: "Remove them completely",
+              },
+              defaultValue: "plain-text",
+              disabled: () => !this.plugin.settings.linkedFileDeletionEnabled,
+            },
+          },
+        ],
+      },
+    ];
+  }
+
+  private organizerControls(prefix: "manual" | "automatic"): SettingGroupItem<ControlSettingKey>[] {
+    const disabled = () => !this.plugin.settings.noteOrganizerEnabled
+      || (prefix === "automatic" && !this.plugin.settings.organizeOnNoteOpen);
+    return [
+      {
+        name: "Empty lines",
+        desc: "Choose how blank lines are cleaned up outside protected Markdown blocks.",
+        control: {
+          type: "dropdown",
+          key: `${prefix}EmptyLines`,
+          options: { remove: "Remove all", collapse: "Collapse repeated blank lines", keep: "Keep all" },
+          defaultValue: "remove",
+          disabled,
+        },
+      },
+      {
+        name: "Move website links to Links",
+        desc: "File standalone website links under the Links list. Requires Website link filing below.",
+        control: {
+          type: "toggle", key: `${prefix}MoveLinks`, defaultValue: true,
+          disabled: () => disabled() || !this.plugin.settings.websiteLinkFilingEnabled,
+        },
+      },
+      {
+        name: "Move tasks to Tasks",
+        desc: "Move top-level tasks and their children under the first Tasks or To-do heading, when present.",
+        control: { type: "toggle", key: `${prefix}MoveTasks`, defaultValue: true, disabled },
+      },
+      {
+        name: "Move free text to Notes",
+        desc: "Move simple text lines and list items under the first Notes heading, when present.",
+        control: { type: "toggle", key: `${prefix}MoveNotes`, defaultValue: true, disabled },
+      },
+      {
+        name: "Add bullets to text",
+        desc: "Add bullets to simple text lines, whether they move to Notes or stay in place.",
+        control: { type: "toggle", key: `${prefix}AddBullets`, defaultValue: true, disabled },
       },
     ];
   }

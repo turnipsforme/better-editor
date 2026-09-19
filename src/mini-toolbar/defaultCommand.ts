@@ -1,6 +1,6 @@
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { App, editorInfoField } from "obsidian";
+import { App, Notice, editorInfoField } from "obsidian";
 
 import { setBgColorEffect, setTextColorEffect, setUnderlineEffect } from "./colorRanges";
 import { getCodeMirrorView } from "./editor-view";
@@ -12,18 +12,33 @@ interface AppWithCommands extends App {
   };
 }
 
-export const cutText = (state: EditorState) => {
+export const cutText = async (state: EditorState): Promise<void> => {
   const editor = getEditorFromState(state);
   if (!editor) return;
-  const originText = editor.getSelection();
-  void window.navigator.clipboard.writeText(editor.getSelection());
-  editor.replaceSelection("", originText);
+  const text = editor.getSelection();
+  const original = editor.getValue();
+  const from = editor.getCursor("from");
+  const to = editor.getCursor("to");
+  try {
+    await window.navigator.clipboard.writeText(text);
+    const currentFrom = editor.getCursor("from");
+    const currentTo = editor.getCursor("to");
+    if (editor.getValue() !== original || from.line !== currentFrom.line || from.ch !== currentFrom.ch
+      || to.line !== currentTo.line || to.ch !== currentTo.ch) return;
+    editor.replaceSelection("");
+  } catch {
+    new Notice("Could not copy to the clipboard. Your text has been kept.");
+  }
 };
 
-export const copyText = (state: EditorState) => {
+export const copyText = async (state: EditorState): Promise<void> => {
   const editor = getEditorFromState(state);
   if (!editor) return;
-  void window.navigator.clipboard.writeText(editor.getSelection());
+  try {
+    await window.navigator.clipboard.writeText(editor.getSelection());
+  } catch {
+    new Notice("Could not copy to the clipboard.");
+  }
 };
 
 // Apply a markdown heading to the full line containing the selection. Any

@@ -230,3 +230,128 @@ describe("organizeCurrentNote", () => {
     ].join("\n"));
   });
 });
+
+const nothingEnabled = {
+  emptyLines: "keep" as const,
+  organizeWebsiteLinks: false,
+  moveTasks: false,
+  moveNotes: false,
+  addBullets: false,
+};
+
+describe("organizer options", () => {
+  const input = "# Inbox\nLoose note\n\n\n- [ ] Task\nhttps://example.test\n# Tasks\n# Notes\n";
+
+  it("makes no changes when every behavior is off", () => {
+    expect(organizeCurrentNote(input, nothingEnabled).text).toBe(input);
+  });
+
+  it.each(["keep", "collapse", "remove"] as const)("supports %s empty lines without other edits", (emptyLines) => {
+    const input = "One\r\n\r\n  \r\nTwo\r\n\r\nThree\r\n";
+    const result = organizeCurrentNote(input, { ...nothingEnabled, emptyLines });
+    const expected = emptyLines === "keep" ? input : emptyLines === "collapse"
+      ? "One\r\n\r\nTwo\r\n\r\nThree\r\n" : "One\r\nTwo\r\nThree\r\n";
+    expect(result.text).toBe(expected);
+    expect(result.removedEmptyLineCount).toBe(emptyLines === "keep" ? 0 : emptyLines === "collapse" ? 1 : 3);
+  });
+
+  it("moves free text without adding bullets", () => {
+    const result = organizeCurrentNote("# Inbox\nText\n# Notes\n", { ...nothingEnabled, moveNotes: true });
+    expect(result.text).toBe("# Inbox\n# Notes\nText\n");
+    expect(result.movedNoteCount).toBe(1);
+    expect(result.bulletAddedCount).toBe(0);
+  });
+
+  it("adds bullets without moving text", () => {
+    expect(organizeCurrentNote("# Inbox\nText\n\n# Notes\n", { ...nothingEnabled, addBullets: true }).text)
+      .toBe("# Inbox\n- Text\n\n# Notes\n");
+  });
+
+  it("moves only tasks, including their children but not trailing blank lines", () => {
+    const input = "# Inbox\nText\n- [ ] Parent\n\n  - [ ] Child\n\n# Tasks\n# Notes\n";
+    const result = organizeCurrentNote(input, { ...nothingEnabled, moveTasks: true });
+    expect(result.text).toBe("# Inbox\nText\n\n# Tasks\n- [ ] Parent\n\n  - [ ] Child\n# Notes\n");
+    expect(result.movedTaskCount).toBe(1);
+    expect(result.movedNoteCount).toBe(0);
+  });
+
+  it("moves only website links", () => {
+    const result = organizeCurrentNote(input, { ...nothingEnabled, organizeWebsiteLinks: true });
+    expect(result.movedLinkCount).toBe(1);
+    expect(result.movedTaskCount).toBe(0);
+    expect(result.movedNoteCount).toBe(0);
+    expect(result.bulletAddedCount).toBe(0);
+    expect(result.removedEmptyLineCount).toBe(0);
+  });
+
+  for (const emptyLines of ["keep", "collapse", "remove"] as const) {
+    for (let mask = 0; mask < 16; mask++) {
+      it(`is stable on repeated use with ${emptyLines} and toggle combination ${mask}`, () => {
+        const options = {
+          emptyLines,
+          organizeWebsiteLinks: !!(mask & 1),
+          moveTasks: !!(mask & 2),
+          moveNotes: !!(mask & 4),
+          addBullets: !!(mask & 8),
+        };
+        const first = organizeCurrentNote(input, options);
+        expect(organizeCurrentNote(first.text, options).text).toBe(first.text);
+        expect(first.movedLinkCount).toBe(options.organizeWebsiteLinks ? 1 : 0);
+        expect(first.movedTaskCount).toBe(options.moveTasks ? 1 : 0);
+        if (!options.moveNotes) expect(first.movedNoteCount).toBe(0);
+        if (!options.addBullets) expect(first.bulletAddedCount).toBe(0);
+      });
+    }
+  }
+});
+
+describe("Markdown safety", () => {
+  it.each([
+    "---\nurls:\n  - https://yaml.test\n---",
+    "````md\n```\nhttps://example.test\n\n\n# Notes\n````",
+    "~~~md\n~~\nhttps://example.test\n~~~",
+    "<!--\nComment text\nhttps://example.test\n\n\nMore comment\n-->",
+    "$$\nx+y\nhttps://example.test\n\n\n$$",
+    "Heading\n=======",
+    "[reference]: https://example.test",
+  ])("keeps literal blocks unchanged: %s", (input) => {
+    expect(moveWebsiteLinks(input).text).toBe(input);
+    expect(organizeCurrentNote(input).text).toBe(input);
+  });
+
+  it("does not append links to a fake Links section inside code", () => {
+    const input = "```\n- [[Links]]\n```\nhttps://real.test";
+    expect(moveWebsiteLinks(input).text).toBe("```\n- [[Links]]\n```\n\n- [[Links]]\n  - [](https://real.test)");
+  });
+
+  it("keeps every existing Links list in place", () => {
+    const input = "- [[Links]]\n  - https://first.test\n# Other\n- [[Links]]\n  - https://second.test";
+    expect(moveWebsiteLinks(input).text).toBe(input);
+  });
+
+  it("does not detach links from parents or children or indented code", () => {
+    const input = "- Parent\n  - https://child.test\nhttps://parent.test\n  Child text\n\n    https://code.test";
+    expect(moveWebsiteLinks(input).text).toBe(input);
+  });
+
+  it("handles thousands of task sections without moving already filed tasks", () => {
+    const input = Array.from({ length: 2000 }, (_, i) => `# Tasks ${i}\n- [ ] Task ${i}`).join("\n");
+    expect(organizeCurrentNote(input).text).toBe(input);
+  });
+});
+
+it("keeps existing blank lines when filing links with Keep all selected", () => {
+  const input = "# Notes\n\n\nhttps://example.test\n\n\n";
+  const result = organizeCurrentNote(input, { ...nothingEnabled, organizeWebsiteLinks: true });
+  expect(result.text).toBe("# Notes\n\n\n\n\n- [[Links]]\n  - [](https://example.test)\n");
+});
+
+
+it("collapses gaps created by moving text in the same run", () => {
+  const input = "# Inbox\n\nText\n\n# Notes\n\nExisting\n";
+  const options = { ...nothingEnabled, emptyLines: "collapse" as const, moveNotes: true };
+  const result = organizeCurrentNote(input, options);
+  expect(result.text).toBe("# Inbox\n\n# Notes\n\nExisting\nText\n");
+  expect(result.removedEmptyLineCount).toBe(1);
+  expect(organizeCurrentNote(result.text, options).text).toBe(result.text);
+});

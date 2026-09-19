@@ -59,6 +59,7 @@ interface ColorState {
   filePath: string | null;
   isMain: boolean;
   needsReload: boolean;
+  enabled: boolean;
 }
 
 const EMPTY_FILE_DATA: FileColorData = { text: [], bg: [], underline: [] };
@@ -312,6 +313,7 @@ export const createColorExtension = (
           filePath: path,
           isMain,
           needsReload: !!path,
+          enabled: isEnabled(),
         };
       }
 
@@ -326,7 +328,7 @@ export const createColorExtension = (
       const decorations = isEnabled()
         ? buildDecorations(state, text, bg, underline)
         : Decoration.none;
-      return { text, bg, underline, decorations, filePath: path, isMain, needsReload: false };
+      return { text, bg, underline, decorations, filePath: path, isMain, needsReload: false, enabled: isEnabled() };
     },
     update(value, tr) {
       let { text, bg, underline, filePath, isMain, needsReload } = value;
@@ -344,6 +346,11 @@ export const createColorExtension = (
 
       const isMainView = isMainEditorView(tr.state);
       const docLen = tr.state.doc.length;
+      const enabled = isEnabled();
+      const hasStyleEffect = tr.effects.some((effect) => effect.is(setTextColorEffect)
+        || effect.is(setBgColorEffect) || effect.is(setUnderlineEffect));
+      if (!tr.docChanged && !hasStyleEffect && path === filePath
+        && isMainView === isMain && !needsReload && enabled === value.enabled) return value;
 
       if (path !== filePath) {
         // Persist previous file's data before switching contexts when we were on the main view.
@@ -388,7 +395,7 @@ export const createColorExtension = (
         text = mapColorRanges(text, tr.changes);
         bg = mapColorRanges(bg, tr.changes);
         underline = mapRanges(underline, tr.changes);
-        dirty = true;
+        dirty = value.text.length > 0 || value.bg.length > 0 || value.underline.length > 0;
       }
 
       if (isEnabled() && isMainView) {
@@ -430,6 +437,7 @@ export const createColorExtension = (
         filePath: path,
         isMain: isMainView,
         needsReload,
+        enabled,
       };
     },
     provide: (field) =>

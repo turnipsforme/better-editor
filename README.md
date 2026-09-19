@@ -10,14 +10,21 @@ Better Editor brings a set of focused writing and workspace tools into one Obsid
 
 ### Note organizer
 
-**Better Editor: Organize current note** can be run at any time, even when automatic organization is off. It:
+**Better Editor: Organize current note** can be run at any time, even when automatic organization is off. Manual and automatic organization each have their own settings:
 
-- removes blank lines outside frontmatter and fenced code
-- moves top-level tasks below the first Tasks, To-do, or similar heading
-- moves simple note lines below the first Notes heading and adds bullets where needed
-- files standalone website links when Website link filing is enabled
+| Setting | Choices / behavior |
+| --- | --- |
+| Empty lines | Remove all, collapse repeated blank lines to one, or keep all |
+| Move website links to Links | File standalone website links under the Links list |
+| Move tasks to Tasks | Move top-level tasks and their children under the first Tasks or To-do heading |
+| Move free text to Notes | Move simple text lines and list items under the first Notes heading |
+| Add bullets to text | Add bullets whether text moves or stays in place |
 
-The organizer leaves YAML frontmatter, fenced code, Markdown headings, indented content, and compound list blocks alone. **Organize notes when opened** can run the same organizer automatically. **Only daily notes** limits it to the Daily notes core plugin's folder and date format.
+Existing behavior stays enabled by default. Turning off **Website link filing** disables link filing in both organizer modes as well as its standalone command. Task and note movement require an existing matching heading; those headings are not created automatically. Turning off movement does not turn off bullet formatting, which has its own switch.
+
+**Organize notes when opened** enables the automatic profile. **Only daily notes** limits it to the Daily notes core plugin's folder and date format. Feature switches appear beside their related settings, and disabled features keep their saved options.
+
+The organizer protects YAML frontmatter, fenced code (including longer fences), HTML comments, display math, headings, link definitions, and compound list blocks. Links nested under another item or attached to indented children stay in place. Empty-line cleanup applies outside protected literal blocks. Organization is an ordinary editor edit that can be undone.
 
 ### Smart selection
 
@@ -70,9 +77,11 @@ Copy `main.js`, `manifest.json`, and `styles.css` into:
 
 Then reload Obsidian and enable **Better Editor**.
 
-## Latest release: 1.1.4
+## Latest release: 1.2.0
 
-Fixes a brief "failed to load" error when Obsidian starts. Tab controls and toolbar refreshes now wait for the workspace to finish opening. Disabling the plugin during startup also cancels its pending setup.
+Adds independent manual and automatic organizer controls and groups settings by feature. Fixes Markdown safety edge cases, toolbar selection bounds, clipboard failure handling, and multiple-cursor task marker deletion. Reduces repeated organizer searches, unnecessary toolbar refreshes, and formatting writes for unstyled notes.
+
+See [the audit notes](AUDIT.md) for changes, validation, and remaining limitations.
 
 ## Development
 

@@ -57,7 +57,8 @@ const getCursorTooltips = (
   if (!sel) return null;
 
   const { anchor, head, empty } = sel;
-  let [start, end] = [anchor, head].sort();
+  const start = Math.min(anchor, head);
+  const end = Math.max(anchor, head);
 
   const createToolbar = (container: HTMLElement) => {
     const toolbar = new ToolBar(container)

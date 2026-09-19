@@ -180,3 +180,115 @@ describe("plugin startup", () => {
     expect(toolbar.refresh).not.toHaveBeenCalled();
   });
 });
+
+import { MarkdownView, TFile, type Editor } from "obsidian";
+import { BetterEditorSettingTab, DEFAULT_SETTINGS, organizerOptions } from "../src/settings";
+
+function textEditor(initial: string): Editor {
+  let text = initial;
+  return {
+    getValue: () => text,
+    getCursor: () => ({ line: 0, ch: 0 }),
+    getLine: (line: number) => text.split("\n")[line],
+    lineCount: () => text.split("\n").length,
+    replaceRange: (updated: string) => { text = updated; },
+    setCursor: vi.fn(),
+  } as unknown as Editor;
+}
+
+describe("organizer integration", () => {
+  it("adds defaults to old saved settings without changing existing choices", async () => {
+    const { plugin } = createWorkspace();
+    vi.mocked(plugin.loadData).mockResolvedValueOnce({ websiteLinkFilingEnabled: false, organizeOnNoteOpen: true });
+    await plugin.onload();
+    expect(plugin.settings.manualEmptyLines).toBe("remove");
+    expect(plugin.settings.automaticEmptyLines).toBe("remove");
+    expect(organizerOptions(plugin.settings, false)).toEqual({
+      emptyLines: "remove", organizeWebsiteLinks: false, moveTasks: true, moveNotes: true, addBullets: true,
+    });
+    plugin.unload();
+  });
+
+  it("uses different profiles for the manual command, open editor, and background file", async () => {
+    const { plugin, workspace } = createWorkspace();
+    await plugin.onload();
+    await plugin.updateSettings({
+      organizeOnNoteOpen: true,
+      manualEmptyLines: "keep", manualMoveLinks: false, manualMoveTasks: false, manualMoveNotes: false, manualAddBullets: false,
+      automaticEmptyLines: "collapse", automaticMoveLinks: false, automaticMoveTasks: false, automaticMoveNotes: false, automaticAddBullets: true,
+    });
+    const input = "# Inbox\nText\n\n\n# Notes\n";
+    const editor = textEditor(input);
+    const command = vi.mocked(plugin.addCommand).mock.calls.map(([command]) => command).find((command) => command.id === "organize-current-note")!;
+    command.editorCallback!(editor, {} as MarkdownView);
+    expect(editor.getValue()).toBe(input);
+
+    const file = Object.assign(new TFile(), { path: "Note.md", extension: "md" });
+    const view = Object.assign(Object.create(MarkdownView.prototype), { file, editor });
+    const getActiveViewOfType = vi.fn(() => view as MarkdownView | null);
+    Object.assign(workspace, { getActiveViewOfType });
+    const fileOpen = workspace.on.mock.calls.find(([name]) => name === "file-open")![1] as unknown as (file: TFile) => void;
+    fileOpen(file);
+    expect(editor.getValue()).toBe("# Inbox\n- Text\n\n# Notes\n");
+
+    const process = vi.fn(async (_file: TFile, update: (text: string) => string) => update(input));
+    Object.assign(plugin.app, { vault: { process } });
+    getActiveViewOfType.mockReturnValue(null);
+    fileOpen(file);
+    expect(process).toHaveBeenCalledTimes(1);
+    expect(await process.mock.results[0].value).toBe(editor.getValue());
+    plugin.unload();
+    fileOpen(file);
+    expect(process).toHaveBeenCalledTimes(1);
+  });
+
+  it("rechecks feature switches when a background edit finally runs", async () => {
+    const { plugin, workspace } = createWorkspace();
+    await plugin.onload();
+    await plugin.updateSettings({ organizeOnNoteOpen: true });
+    let update!: (text: string) => string;
+    Object.assign(workspace, { getActiveViewOfType: () => null });
+    Object.assign(plugin.app, { vault: { process: vi.fn(async (_file: TFile, callback: typeof update) => { update = callback; }) } });
+    const fileOpen = workspace.on.mock.calls.find(([name]) => name === "file-open")![1] as unknown as (file: TFile) => void;
+    fileOpen(Object.assign(new TFile(), { path: "Note.md", extension: "md" }));
+    await plugin.updateSettings({ organizeOnNoteOpen: false });
+    expect(update("Text\n\n")).toBe("Text\n\n");
+    plugin.unload();
+  });
+
+  it("does not refresh unrelated UI for an organizer setting", async () => {
+    const { plugin, workspace } = createWorkspace(true);
+    await plugin.onload();
+    toolbar.refresh.mockClear();
+    workspace.iterateRootLeaves.mockClear();
+    await plugin.updateSettings({ manualEmptyLines: "keep" });
+    expect(toolbar.refresh).not.toHaveBeenCalled();
+    expect(workspace.iterateRootLeaves).not.toHaveBeenCalled();
+    plugin.unload();
+  });
+
+  it("groups options after their feature switches and disables dependent controls", () => {
+    const { plugin } = createWorkspace();
+    plugin.settings = { ...DEFAULT_SETTINGS };
+    const definitions = new BetterEditorSettingTab(plugin.app, plugin).getSettingDefinitions();
+    expect(definitions.map((item) => "heading" in item ? item.heading : "name" in item ? item.name : "")).toEqual([
+      "Note organizer", "Manual organization", "Automatic organization", "Website link filing", "Smart selection",
+      "Task marker deletion", "Mini toolbar", "Mini toolbar", "Tab bar controls", "Tab bar", "Linked file deletion", "Linked file deletion",
+    ]);
+    const controls = definitions.flatMap((item) => "items" in item ? item.items : [item])
+      .flatMap((item) => item && "control" in item && item.control ? [item.control] : []);
+    const isDisabled = (key: string) => {
+      const disabled = controls.find((control) => control.key === key)!.disabled;
+      return typeof disabled === "function" ? disabled() : disabled;
+    };
+    expect(isDisabled("manualMoveNotes")).toBe(false);
+    expect(isDisabled("automaticMoveNotes")).toBe(true);
+    plugin.settings.organizeOnNoteOpen = true;
+    expect(isDisabled("automaticMoveNotes")).toBe(false);
+    plugin.settings.websiteLinkFilingEnabled = false;
+    expect(isDisabled("manualMoveLinks")).toBe(true);
+    plugin.settings.noteOrganizerEnabled = false;
+    expect(isDisabled("manualAddBullets")).toBe(true);
+    expect(isDisabled("automaticEmptyLines")).toBe(true);
+  });
+});
