@@ -56,7 +56,7 @@ const getCursorTooltips = (
   const createToolbar = (container: HTMLElement) => {
     const toolbar = new ToolBar(container)
       .addSmallButton((btn) =>
-        btn.setIcon("scissors").setTooltip("Cut").onClick(() => cutText(state)),
+        btn.setIcon("scissors").setTooltip("Cut").onClick(() => { void cutText(state); }),
       )
       .addSmallButton((btn) =>
         configureActionButton(
@@ -65,7 +65,7 @@ const getCursorTooltips = (
           settings.copyButtonAction,
           "copy",
           "Copy",
-          () => copyText(state),
+          () => { void copyText(state); },
         ),
       )
       .addSmallButton((btn) => btn.setIcon("bold").setTooltip("Bold").onClick(() => boldText(app)))

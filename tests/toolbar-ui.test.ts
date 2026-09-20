@@ -50,6 +50,7 @@ beforeAll(() => {
     empty(this: HTMLElement) { this.replaceChildren(); },
     appendText(this: HTMLElement, text: string) { this.append(text); },
     setAttr(this: HTMLElement, name: string, value: string) { this.setAttribute(name, value); },
+    setCssStyles(this: HTMLElement, styles: Partial<CSSStyleDeclaration>) { Object.assign(this.style, styles); },
     detach(this: HTMLElement) { this.remove(); },
   });
 });

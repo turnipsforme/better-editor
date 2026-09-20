@@ -77,7 +77,11 @@ Copy `main.js`, `manifest.json`, and `styles.css` into:
 
 Then reload Obsidian and enable **Better Editor**.
 
-## Latest release: 1.3.0
+## Latest release: 1.3.1
+
+Fixes the Obsidian review findings by using its supported style helper for toolbar positioning and making the cut and copy button callbacks return synchronously. Clipboard actions still run asynchronously and keep their existing failure handling.
+
+### 1.3.0
 
 Removes the color picker, its menus, color-setting actions, and unused menu styles. The six remaining toolbar buttons have clear labels and focus indicators, retain the selection when clicked, and update immediately when their heading options change. Positioning handles rapid updates, right-to-left selections, existing selections on startup, and closed toolbars. Escape dismisses the toolbar; opening and closing stay instant.
 

@@ -167,7 +167,7 @@ export class ViewPluginClass implements PluginValue {
         ],
       });
       if (this.toolbar !== toolbar || request !== this.positionRequest) return;
-      Object.assign(toolbar.dom.style, {
+      toolbar.dom.setCssStyles({
         top: "0", left: "0", visibility: "visible",
         transform: `translate(${Math.round(x)}px,${Math.round(y)}px)`,
       });
@@ -185,7 +185,7 @@ export class ViewPluginClass implements PluginValue {
       read: this.readFromDOM,
       write: (rect) => {
         if (rect) void this.computePosition(rect);
-        else if (this.toolbar) this.toolbar.dom.style.visibility = "hidden";
+        else if (this.toolbar) this.toolbar.dom.setCssStyles({ visibility: "hidden" });
       },
     });
   }
