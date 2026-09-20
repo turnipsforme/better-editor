@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { EditorState, StateField } from "@codemirror/state";
+import { EditorSelection, EditorState, StateField } from "@codemirror/state";
 import type { App } from "obsidian";
 
 vi.mock("obsidian", async () => {
@@ -11,7 +11,7 @@ vi.mock("obsidian", async () => {
 });
 
 import { editorInfoField } from "obsidian";
-import { createColorExtension, setTextColorEffect } from "../src/mini-toolbar/colorRanges";
+import { createColorExtension, setUnderlineEffect } from "../src/mini-toolbar/colorRanges";
 import { cutText } from "../src/mini-toolbar/defaultCommand";
 import { cursorTooltipField } from "../src/mini-toolbar/toolbar";
 import { DEFAULT_TOOLBAR_SETTINGS } from "../src/mini-toolbar/toolbar-settings";
@@ -32,14 +32,14 @@ describe("toolbar state", () => {
     expect(state.field(field)).toBe(initial);
     state = state.update({ changes: { from: 5, insert: "!" } }).state;
     expect(save).not.toHaveBeenCalled();
-    state = state.update({ effects: setTextColorEffect.of({ from: 0, to: 5, color: "red" }) }).state;
+    state = state.update({ effects: setUnderlineEffect.of({ from: 0, to: 5, enable: true }) }).state;
     expect(save).toHaveBeenCalledTimes(1);
     const colored = state.field(field);
     state = state.update({ selection: { anchor: 3 } }).state;
     expect(state.field(field)).toBe(colored);
     state = state.update({ changes: { from: 0, to: 5, insert: "" } }).state;
     expect(save).toHaveBeenCalledTimes(2);
-    expect(save.mock.lastCall?.[1].text).toEqual([]);
+    expect(save.mock.lastCall?.[1].underline).toEqual([]);
   });
 
   it("hides and restores saved styles when the feature is toggled", () => {
@@ -82,4 +82,15 @@ describe("clipboard safety", () => {
     expect(replaceSelection).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
+});
+
+
+it("anchors the toolbar to the primary selection when several ranges exist", () => {
+  const field = cursorTooltipField({} as App, () => DEFAULT_TOOLBAR_SETTINGS);
+  const state = EditorState.create({
+    doc: "0123456789abcdef",
+    selection: EditorSelection.create([EditorSelection.range(1, 3), EditorSelection.range(10, 14)], 1),
+    extensions: [EditorState.allowMultipleSelections.of(true), field],
+  });
+  expect(state.field(field)).toMatchObject({ start: 10, end: 14 });
 });

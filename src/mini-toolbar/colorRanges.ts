@@ -32,18 +32,6 @@ export interface ColorStorage {
   save(path: string, data: FileColorData): void;
 }
 
-export const setTextColorEffect = StateEffect.define<{
-  from: number;
-  to: number;
-  color: string | null;
-}>();
-
-export const setBgColorEffect = StateEffect.define<{
-  from: number;
-  to: number;
-  color: string | null;
-}>();
-
 export const setUnderlineEffect = StateEffect.define<{
   from: number;
   to: number;
@@ -126,48 +114,6 @@ const mapRanges = (ranges: Range[], changes: ChangeDesc): Range[] => {
     result.push({ from, to });
   }
   return result;
-};
-
-const applyColorChange = (
-  ranges: ColorRange[],
-  change: { from: number; to: number; color: string | null },
-): ColorRange[] => {
-  const { from, to, color } = change;
-  if (from >= to) return ranges;
-
-  const next: ColorRange[] = [];
-  for (const r of ranges) {
-    if (r.to <= from || r.from >= to) {
-      // No overlap
-      next.push(r);
-      continue;
-    }
-    // Left remainder
-    if (r.from < from) {
-      next.push({ from: r.from, to: from, color: r.color });
-    }
-    // Right remainder
-    if (r.to > to) {
-      next.push({ from: to, to: r.to, color: r.color });
-    }
-  }
-
-  if (color != null) {
-    next.push({ from, to, color });
-  }
-
-  // Sort and merge adjacent same-color ranges
-  next.sort((a, b) => a.from - b.from || a.to - b.to);
-  const merged: ColorRange[] = [];
-  for (const r of next) {
-    const last = merged[merged.length - 1];
-    if (last && last.color === r.color && last.to >= r.from) {
-      last.to = Math.max(last.to, r.to);
-    } else {
-      merged.push({ ...r });
-    }
-  }
-  return merged;
 };
 
 const subtractRange = (ranges: Range[], from: number, to: number): Range[] => {
@@ -347,8 +293,7 @@ export const createColorExtension = (
       const isMainView = isMainEditorView(tr.state);
       const docLen = tr.state.doc.length;
       const enabled = isEnabled();
-      const hasStyleEffect = tr.effects.some((effect) => effect.is(setTextColorEffect)
-        || effect.is(setBgColorEffect) || effect.is(setUnderlineEffect));
+      const hasStyleEffect = tr.effects.some((effect) => effect.is(setUnderlineEffect));
       if (!tr.docChanged && !hasStyleEffect && path === filePath
         && isMainView === isMain && !needsReload && enabled === value.enabled) return value;
 
@@ -400,13 +345,7 @@ export const createColorExtension = (
 
       if (isEnabled() && isMainView) {
         for (const e of tr.effects) {
-          if (e.is(setTextColorEffect)) {
-            text = applyColorChange(text, e.value);
-            dirty = true;
-          } else if (e.is(setBgColorEffect)) {
-            bg = applyColorChange(bg, e.value);
-            dirty = true;
-          } else if (e.is(setUnderlineEffect)) {
+          if (e.is(setUnderlineEffect)) {
             underline = applyUnderlineChange(underline, e.value);
             dirty = true;
           }

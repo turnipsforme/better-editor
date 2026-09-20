@@ -40,11 +40,11 @@ When Backspace or Delete reaches a task marker such as `- [ ] ` or `- [x] `, Bet
 
 ### Mini toolbar
 
-On desktop, a floating toolbar appears when you select text. It includes cut, copy, bold, italic, strikethrough, underline, and a color menu for text and highlights.
+On desktop, a floating toolbar appears when you select text. It includes cut, copy, bold, italic, strikethrough, and underline. The color picker has been removed.
 
 The Copy, Strikethrough, and Underline buttons can each be changed to Heading 2, Heading 3, or Heading 4 in Better Editor's settings. Heading actions replace an existing heading marker cleanly. The toolbar and saved styling also work in Journal View editors, while small embedded editors such as table cells are left alone.
 
-Text colors, highlights, and underlines are stored in Better Editor's local plugin data instead of being written into the Markdown. They will not appear in other Markdown apps and are hidden while the Mini toolbar feature is disabled.
+Underlines and any colors or highlights saved in earlier releases are stored in Better Editor's local plugin data instead of being written into the Markdown. Existing saved formatting remains readable, but there is no color picker or color-setting action. They will not appear in other Markdown apps and are hidden while the Mini toolbar feature is disabled.
 
 ### Tab bar controls
 
@@ -77,11 +77,11 @@ Copy `main.js`, `manifest.json`, and `styles.css` into:
 
 Then reload Obsidian and enable **Better Editor**.
 
-## Latest release: 1.2.0
+## Latest release: 1.3.0
 
-Adds independent manual and automatic organizer controls and groups settings by feature. Fixes Markdown safety edge cases, toolbar selection bounds, clipboard failure handling, and multiple-cursor task marker deletion. Reduces repeated organizer searches, unnecessary toolbar refreshes, and formatting writes for unstyled notes.
+Removes the color picker, its menus, color-setting actions, and unused menu styles. The six remaining toolbar buttons have clear labels and focus indicators, retain the selection when clicked, and update immediately when their heading options change. Positioning handles rapid updates, right-to-left selections, existing selections on startup, and closed toolbars. Escape dismisses the toolbar; opening and closing stay instant.
 
-See [the audit notes](AUDIT.md) for changes, validation, and remaining limitations.
+Existing saved formatting remains readable. See [the audit notes](AUDIT.md) for the Emil-based toolbar review, validation, and remaining limitations.
 
 ## Development
 

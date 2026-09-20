@@ -4,8 +4,6 @@ import {
   BaseComponent,
   ButtonComponent,
   Component,
-  Menu,
-  setIcon,
 } from "obsidian";
 
 import { showTooltip, Tooltip } from "./popper";
@@ -17,11 +15,6 @@ import {
   cutText,
   italicText,
   strikethroughText,
-  NOTION_TEXT_COLOR_NAMES,
-  setTextColorByName,
-  NOTION_TEXT_COLOR_MAP,
-  NOTION_BG_COLOR_NAMES,
-  setBgColorByName,
   toggleUnderline,
 } from "./defaultCommand";
 import { isCodeMirrorView, type EditorWithCodeMirror } from "./editor-view";
@@ -53,17 +46,17 @@ const getCursorTooltips = (
   const settings = getSettings();
   if (!settings.enabled) return null;
 
-  const sel = state.selection.ranges[0];
-  if (!sel) return null;
+  const sel = state.selection.main;
+  if (!sel || sel.empty) return null;
 
-  const { anchor, head, empty } = sel;
+  const { anchor, head } = sel;
   const start = Math.min(anchor, head);
   const end = Math.max(anchor, head);
 
   const createToolbar = (container: HTMLElement) => {
     const toolbar = new ToolBar(container)
       .addSmallButton((btn) =>
-        btn.setIcon("scissors").onClick(() => cutText(state)),
+        btn.setIcon("scissors").setTooltip("Cut").onClick(() => cutText(state)),
       )
       .addSmallButton((btn) =>
         configureActionButton(
@@ -75,9 +68,9 @@ const getCursorTooltips = (
           () => copyText(state),
         ),
       )
-      .addSmallButton((btn) => btn.setIcon("bold").onClick(() => boldText(app)))
+      .addSmallButton((btn) => btn.setIcon("bold").setTooltip("Bold").onClick(() => boldText(app)))
       .addSmallButton((btn) =>
-        btn.setIcon("italic").onClick(() => italicText(app)),
+        btn.setIcon("italic").setTooltip("Italic").onClick(() => italicText(app)),
       )
       .addSmallButton((btn) =>
         configureActionButton(
@@ -98,25 +91,13 @@ const getCursorTooltips = (
           "Underline",
           () => toggleUnderline(state),
         ),
-      )
-      // Text color dropdown (Notion-like colors)
-      .addSmallButton((btn) =>
-        btn
-          .setDropdownIcon("palette")
-          .setTooltip("Text color")
-          .setOptionsList(NOTION_TEXT_COLOR_NAMES)
-          .setOnSelectOption((name) => setTextColorByName(state, name))
-          .setOnSelectBgOption((name) => setBgColorByName(state, name))
-          // onClick is required to attach the dropdown handler
-          .onClick(() => {}),
       );
-
     return toolbar;
   };
 
   return {
-    start: start,
-    end: empty ? undefined : end,
+    start,
+    end,
     create: createToolbar,
   };
 };
@@ -190,22 +171,16 @@ export const refreshVisibleToolbars = (app: App) => {
   }
 };
 
-const getComponentDom = (component: object): HTMLElement | undefined => {
-  const dom = (component as { dom?: unknown }).dom;
-  return dom instanceof HTMLElement ? dom : undefined;
-};
-
 class SmallButton extends BaseComponent {
   button: ButtonComponent;
-  dropdownOptions: string[] = [];
-  onSelectOption: ((title: string) => void) | null = null;
-  onSelectBgOption: ((title: string) => void) | null = null;
-  menu: Menu | undefined;
-  menuOpened = false;
-
   constructor(containerEl: HTMLElement) {
     super();
     this.button = new ButtonComponent(containerEl);
+    this.button.buttonEl.type = "button";
+    // Keep the editor selection and active command target on pointer presses.
+    this.button.buttonEl.addEventListener("mousedown", (event) => {
+      if (event.button === 0) event.preventDefault();
+    });
   }
 
   setIcon(iconId: string): this {
@@ -224,171 +199,16 @@ class SmallButton extends BaseComponent {
     return this;
   }
 
-  setDropdownIcon(iconId: string = "highlighter"): this {
-    const highlightIconDiv = this.button.buttonEl.createDiv(
-      "better-editor-mini-toolbar-highlight-icon",
-    );
-    const iconDiv = this.button.buttonEl.createDiv(
-      "better-editor-mini-toolbar-icon-with-icon",
-    );
-    setIcon(highlightIconDiv, iconId);
-    setIcon(iconDiv, "chevron-down");
-
-    return this;
-  }
-
   setTooltip(tooltip: string): this {
     this.button.setTooltip(tooltip);
-    return this;
-  }
-
-  setOptionsList(optionsList: string[]): this {
-    this.dropdownOptions = optionsList;
-    return this;
-  }
-
-  setOnSelectOption(handler: (title: string) => void): this {
-    this.onSelectOption = handler;
-    return this;
-  }
-
-  setOnSelectBgOption(handler: (title: string) => void): this {
-    this.onSelectBgOption = handler;
+    this.button.buttonEl.setAttribute("aria-label", tooltip);
     return this;
   }
 
   onClick(cb: (evt: MouseEvent) => void): this {
-    if (this.dropdownOptions.length > 0) {
-      this.button.onClick((evt) => this.showEditMenu(evt));
-      return this;
-    }
     this.button.onClick(cb);
     return this;
   }
-
-  showEditMenu(event: MouseEvent): void {
-    this.menuOpened = !this.menuOpened;
-    if (!this.menuOpened) {
-      return;
-    }
-    this.menu = new Menu();
-    this.menu.onHide(() => {
-      this.menuOpened = false;
-    });
-
-    // Customize menu DOM to mimic Notion color picker
-    const menuEl = getComponentDom(this.menu);
-    if (menuEl) {
-      menuEl.addClass("better-editor-mini-toolbar-color-menu");
-      // Defer grid/header decoration until after items are rendered
-    }
-
-    const sortButton = event.currentTarget as HTMLElement;
-    const currentTargetRect = sortButton.getBoundingClientRect();
-    const menuShowPoint = {
-      x: currentTargetRect.left - 6,
-      y: currentTargetRect.bottom + 6,
-    };
-    // Text color items
-    for (let a = 0; a < this.dropdownOptions?.length; a++) {
-      const name = this.dropdownOptions[a];
-      const colorHex =
-        name === "Default"
-          ? "var(--text-normal)"
-          : NOTION_TEXT_COLOR_MAP[name];
-      this.menu.addItem((item) => {
-        item.setTitle("A").onClick(() => {
-          this.onSelectOption?.(name);
-        });
-        const tooltip = name === "Default" ? "Default" : `${name} text`;
-        const itemEl = getComponentDom(item);
-        itemEl?.setAttr("title", tooltip);
-        itemEl?.setAttr("data-color-kind", "text");
-        itemEl?.addClass("better-editor-mini-toolbar-color-item");
-        const titleEl = itemEl?.querySelector<HTMLElement>(".menu-item-title");
-        if (titleEl) {
-          titleEl.setCssStyles({ color: colorHex });
-        }
-      });
-    }
-
-    // Visual separator between sections
-    this.menu.addSeparator();
-
-    // Background highlight items
-    for (let b = 0; b < NOTION_BG_COLOR_NAMES.length; b++) {
-      const name = NOTION_BG_COLOR_NAMES[b];
-      const colorValue = name === "Default" ? "transparent" : `var(--better-editor-toolbar-bg-${name.toLowerCase()})`;
-      this.menu.addItem((item) => {
-        item.setTitle("A").onClick(() => {
-          this.onSelectBgOption?.(name);
-        });
-        const tooltip = name === "Default" ? "Default background" : `${name} background`;
-        const itemEl = getComponentDom(item);
-        itemEl?.setAttr("title", tooltip);
-        itemEl?.setAttr("data-color-kind", "background");
-        itemEl?.addClass("better-editor-mini-toolbar-color-item");
-        const titleEl = itemEl?.querySelector<HTMLElement>(".menu-item-title");
-        if (titleEl) {
-          titleEl.setCssStyles({
-            backgroundColor: colorValue,
-            color: "var(--text-normal)",
-          });
-        }
-      });
-    }
-
-    this.menu.setParentElement(sortButton).showAtPosition(menuShowPoint);
-
-    // Decorate once DOM is fully built
-    window.requestAnimationFrame(() => {
-      const menuEl = this.menu ? getComponentDom(this.menu) : undefined;
-      if (!menuEl) return;
-      const scrollerEl =
-        menuEl.querySelector<HTMLElement>(".menu-scroller") ||
-        menuEl.querySelector<HTMLElement>(".menu-scroll") ||
-        menuEl;
-
-      // Try to split items into two groups (text/background)
-      let groups = Array.from(scrollerEl.querySelectorAll<HTMLElement>(".menu-group"));
-
-      if (groups.length === 1) {
-        // Create a second group and move background items into it
-        const bgGroup = scrollerEl.createDiv({ cls: "menu-group" });
-        const allItems = Array.from(groups[0].querySelectorAll<HTMLElement>(".menu-item"));
-        for (const it of allItems) {
-          const kind = it.getAttr("data-color-kind");
-          if (kind === "background") {
-            bgGroup.appendChild(it);
-          }
-        }
-        // Insert bg group after original
-        groups[0].insertAdjacentElement("afterend", bgGroup);
-        groups = [groups[0], bgGroup];
-      }
-
-      const textGroup = groups[0];
-      const bgGroup = groups[1];
-
-      if (textGroup) {
-        const textHeader = scrollerEl.createDiv({
-          cls: "better-editor-mini-toolbar-color-header",
-          text: "Text colour",
-        });
-        scrollerEl.insertBefore(textHeader, textGroup);
-        textGroup.addClass("better-editor-mini-toolbar-color-grid");
-      }
-      if (bgGroup) {
-        const bgHeader = scrollerEl.createDiv({
-          cls: "better-editor-mini-toolbar-color-header",
-          text: "Background",
-        });
-        scrollerEl.insertBefore(bgHeader, bgGroup);
-        bgGroup.addClass("better-editor-mini-toolbar-color-grid");
-      }
-    });
-  }
-
 }
 
 export class ToolBar extends Component {
@@ -399,21 +219,19 @@ export class ToolBar extends Component {
     super();
     this.dom = container.createDiv({ cls: "cm-better-editor-mini-toolbar" });
     this.smallBtnContainer = this.dom;
+    this.dom.setAttribute("role", "group");
+    this.dom.setAttribute("aria-label", "Text formatting");
   }
 
   addSmallButton(cb: (button: SmallButton) => unknown): this {
-    cb(new SmallButton(this.smallBtnContainer));
+    const button = new SmallButton(this.smallBtnContainer);
+    cb(button);
     return this;
   }
 
-  unloading: boolean = false;
-
-  hide() {
+  hide(): this {
     this.unload();
-    if (this.unloading) return this;
-    this.unloading = true;
     this.dom.detach();
-    this.unloading = false;
     return this;
   }
 }

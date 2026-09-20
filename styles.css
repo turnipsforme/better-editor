@@ -39,10 +39,12 @@
   padding-left: calc(var(--frame-left-space) + var(--size-4-3));
 }
 
-/* Mini toolbar and its text/background color menu. */
+/* Selection toolbar. Opening and closing stay instant. */
 .cm-better-editor-mini-toolbar {
   position: absolute;
-  width: auto;
+  visibility: hidden;
+  width: max-content;
+  max-width: 100%;
   height: auto;
   padding: 3px;
   display: flex;
@@ -62,24 +64,15 @@
   display: flex;
   cursor: pointer;
   padding: 5px;
+  min-width: 28px;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
   box-shadow: none;
   position: relative;
   border-radius: 3px;
   font-size: var(--editor-font-size);
   background-color: var(--background-primary-alt);
-}
-
-.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-icon-with-text {
-  padding: 0;
-  margin-left: 6px;
-  margin-bottom: -6px;
-  margin-right: -2px;
-}
-
-.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-highlight-icon,
-.cm-better-editor-mini-toolbar .better-editor-mini-toolbar-icon-with-icon {
-  padding: 0;
-  margin-bottom: -6px;
 }
 
 .cm-better-editor-mini-toolbar .better-editor-mini-toolbar-heading-icon {
@@ -93,6 +86,7 @@
   line-height: 1;
 }
 
+/* Legacy highlight values keep previously saved formatting readable. */
 .theme-light {
   --better-editor-toolbar-bg-gray: #eaeaea;
   --better-editor-toolbar-bg-brown: #eee0da;
@@ -117,66 +111,24 @@
   --better-editor-toolbar-bg-red: #4a2e2e;
 }
 
-.better-editor-mini-toolbar-color-menu.menu {
-  width: auto;
-  padding: 6px 8px;
+
+@media (hover: hover) and (pointer: fine) {
+  .cm-better-editor-mini-toolbar button:hover {
+    background-color: var(--background-modifier-hover);
+  }
+
+  .cm-better-editor-mini-toolbar button:active {
+    transform: scale(0.97);
+  }
 }
 
-.better-editor-mini-toolbar-color-menu .better-editor-mini-toolbar-color-header {
-  font-size: 12px;
-  color: var(--text-muted);
-  margin: 6px 8px 2px;
+.cm-better-editor-mini-toolbar button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
 }
 
-.better-editor-mini-toolbar-color-menu .menu-group,
-.better-editor-mini-toolbar-color-menu .better-editor-mini-toolbar-color-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 28px);
-  gap: 8px;
-  padding: 6px 8px 10px;
-}
-
-.better-editor-mini-toolbar-color-menu .menu-group .menu-item,
-.better-editor-mini-toolbar-color-menu
-  .better-editor-mini-toolbar-color-grid
-  .menu-item {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  margin: 0;
-}
-
-.better-editor-mini-toolbar-color-menu .menu-group .menu-item .menu-item-icon,
-.better-editor-mini-toolbar-color-menu
-  .better-editor-mini-toolbar-color-grid
-  .menu-item
-  .menu-item-icon {
-  display: none;
-}
-
-.better-editor-mini-toolbar-color-menu .menu-group .menu-item .menu-item-title,
-.better-editor-mini-toolbar-color-menu
-  .better-editor-mini-toolbar-color-grid
-  .menu-item
-  .menu-item-title {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  border-radius: 6px;
-  border: 1px solid var(--background-modifier-border);
-  background-color: var(--background-primary);
-}
-
-.better-editor-mini-toolbar-color-menu
-  .menu-group
-  .menu-item:hover
-  .menu-item-title,
-.better-editor-mini-toolbar-color-menu
-  .better-editor-mini-toolbar-color-grid
-  .menu-item:hover
-  .menu-item-title {
-  border-color: var(--interactive-accent);
+@media (prefers-reduced-motion: reduce) {
+  .cm-better-editor-mini-toolbar button:active {
+    transform: none;
+  }
 }

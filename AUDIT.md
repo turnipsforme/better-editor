@@ -1,3 +1,30 @@
+# Mini toolbar review for 1.3.0
+
+Reviewed the complete selection-toolbar UI, actions, settings refresh, positioning, selection handling, styles, and lifecycle using Emil Kowalski's design-engineering guidance. This is a frequent editing control, so opening and closing remain immediate. The user requested removal of the color picker.
+
+| Before | After | Why |
+| --- | --- | --- |
+| Color picker button, menus, palette actions, DOM customization, and menu styles | All removed; six formatting buttons remain | Remove the unwanted feature and its upkeep |
+| Some icon buttons had no descriptive tooltip | Every button has a tooltip and accessible name | Make actions understandable without guessing icons |
+| Pointer presses could move focus away from the editor | Primary mouse presses keep editor focus and selection | Apply formatting to the intended selection |
+| Button settings changed while visible UI remained stale | Settings refresh rebuilds the visible toolbar immediately | Heading replacements should take effect at once |
+| A toolbar could appear before positioning completed | Toolbar stays hidden until its position is ready | Avoid a flash in the wrong place |
+| Older async position results could overwrite newer ones | Only the latest request can update the current toolbar | Avoid jumps during rapid selection changes |
+| Selection bounds disagreed with reported width for right-to-left text | Bounds and width use the same minimum and maximum coordinates | Give positioning consistent geometry |
+| The first selection range anchored the popup | The primary selection anchors it | Match the selection used by the formatting actions |
+| An existing selection did not create a toolbar at startup | Initial nonempty selections create one immediately | Consistent behavior when enabling the feature |
+| No explicit keyboard focus treatment or dismissal | Visible focus outlines and Escape dismissal | Support keyboard use |
+| Generic button styling and tiny unconstrained targets | At least 28px targets, hover feedback for precise pointers, subtle press feedback | Improve desktop usability without slowing frequent actions |
+| Deep equality checks over tooltip objects containing newly created functions | Identity checks plus explicit settings refresh | Remove work that could not avoid an update; remove the unused dependency |
+
+Saved text colors and highlights from older releases remain readable, alongside underline support. Their storage and legacy theme values remain for compatibility; no picker or code for applying new colors remains.
+
+Validation: all 130 tests passed, including eight new DOM interaction tests and a primary-selection regression. TypeScript checks and the production build passed. DOM tests cover six-button rendering, accessible names, empty selections, live heading-setting changes, click selection retention, right-to-left bounds, async result ordering, destruction, and positioning failures. The production JavaScript bundle is about 9.6 KB smaller than 1.2.0. The test DOM library is a development-only dependency.
+
+No Obsidian app controls or live-vault UI tests were used. Native theme rendering, real layout measurement, and keyboard behavior inside Obsidian remain unverified by these DOM tests. The position-based formatting limitations described below still apply.
+
+---
+
 # Reliability and performance review for 1.2.0
 
 Reviewed the organizer, settings and startup, editor commands, toolbar and local formatting storage, tab controls, task marker handling, and linked-file deletion. Changes focus on concrete faults and repeated work rather than replacing the plugin architecture.

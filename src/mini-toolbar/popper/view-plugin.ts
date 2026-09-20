@@ -6,24 +6,13 @@ import {
 } from "@codemirror/view";
 import { ClientRectObject } from "@floating-ui/core";
 import { computePosition, flip, offset, shift } from "@floating-ui/dom";
-import equal from "fast-deep-equal";
+import { refreshMiniToolbarEffect } from "../effects";
 import { editorInfoField } from "obsidian";
 
 import { ToolBar } from "../toolbar";
 import { tooltipConfig } from "./config";
 import { ToolbarEventName, Tooltip } from "./define";
 import { showTooltip } from "./index";
-
-const getRectFromXY = (x = 0, y = 0): ClientRectObject => ({
-  width: 0,
-  height: 0,
-  top: y,
-  left: x,
-  bottom: y,
-  right: x,
-  x,
-  y,
-});
 
 const isEmbeddedEditorView = (view: EditorView): boolean => {
   // Known wrapper for Obsidian Live Preview table cell editors.
@@ -33,13 +22,10 @@ const isEmbeddedEditorView = (view: EditorView): boolean => {
 
 const isSelectionInsideEmbeddedChild = (view: EditorView): boolean => {
   try {
-    const root = view.root;
-    const sel = root instanceof Document
-      ? root.getSelection()
-      : (root as ShadowRoot).ownerDocument.getSelection();
+    const sel = view.dom.ownerDocument.getSelection();
     const node = sel?.anchorNode as Node | null;
     if (!node) return false;
-    const el = (node.nodeType === Node.ELEMENT_NODE ? (node as Element) : (node.parentElement)) as HTMLElement | null;
+    const el = (node.nodeType === 1 ? (node as Element) : (node.parentElement)) as HTMLElement | null;
     if (!el) return false;
     // If selection lives inside a table widget, treat it as embedded.
     return !!el.closest(".cm-table-widget");
@@ -47,35 +33,23 @@ const isSelectionInsideEmbeddedChild = (view: EditorView): boolean => {
     return false;
   }
 };
-type VirtualElement = {
-  getBoundingClientRect(): ClientRectObject;
-  contextElement?: Element;
-};
-
 type Rect = { left: number; right: number; top: number; bottom: number };
-const getRectFromPosCoords = (
+export const getRectFromPosCoords = (
   start: Rect | null,
   end?: Rect | null,
 ): ClientRectObject | null => {
   if (!start) return null;
-  let rect = {
-    left: start.left,
-    right: start.right,
-    top: start.top,
-    bottom: start.bottom,
-    width: 0,
-    height: start.bottom - start.top,
-    x: start.left,
-    y: start.top,
+  const left = Math.min(start.left, end?.left ?? start.left);
+  const right = Math.max(start.right, end?.right ?? start.right);
+  return {
+    left, right, top: start.top, bottom: start.bottom,
+    width: right - left, height: start.bottom - start.top,
+    x: left, y: start.top,
   };
-  if (end) rect.width = Math.abs(end.left - start.left);
-  return rect;
 };
-const initialRect = getRectFromXY();
 
-class ViewPluginClass implements PluginValue {
+export class ViewPluginClass implements PluginValue {
   containerEl = this.view.dom;
-  virtualEl: VirtualElement & { rect: ClientRectObject };
   toolbar: ToolBar | null = null;
   embedded: boolean;
 
@@ -85,27 +59,21 @@ class ViewPluginClass implements PluginValue {
 
   tooltipInfo: Tooltip | null;
 
-  inView = true;
+  private positionRequest = 0;
 
   defaultPlacement = this.view.state.facet(tooltipConfig).defaultPlacement;
 
   constructor(readonly view: EditorView) {
     this.tooltipInfo = view.state.facet(showTooltip);
     this.embedded = isEmbeddedEditorView(view);
-    this.virtualEl = {
-      rect: initialRect,
-      getBoundingClientRect() {
-        return this.rect;
-      },
-      // contextElement: this.view.scrollDOM,
-    };
+    if (this.view.inView && !this.shouldRemoveToolbar() && this.tooltipInfo) this.createToolbar(this.tooltipInfo);
     this.maybeMeasure();
   }
 
   shouldRemoveToolbar(input?: Tooltip | null): boolean {
     if (this.embedded) return true;
     const info = input ?? this.tooltipInfo;
-    return !info?.end;
+    return !info || info.end === undefined || info.end <= info.start;
   }
 
   createToolbar(input?: Tooltip): void {
@@ -129,33 +97,29 @@ class ViewPluginClass implements PluginValue {
   }
 
   removeToolbar(): void {
+    this.positionRequest++;
     if (!this.toolbar) return;
     this.toolbar.hide();
     this.toolbar = null;
   }
 
-  update(update: ViewUpdate) {
-    if (this.embedded || isSelectionInsideEmbeddedChild(this.view)) {
-      if (this.toolbar) this.removeToolbar();
+  update(update: ViewUpdate): void {
+    const input = update.state.facet(showTooltip);
+    const updated = input !== this.tooltipInfo;
+    this.tooltipInfo = input;
+    if (this.embedded || !this.view.inView || isSelectionInsideEmbeddedChild(this.view)) {
+      this.removeToolbar();
       return;
     }
-    let input = update.state.facet(showTooltip);
-    let updated = input !== this.tooltipInfo && !equal(input, this.tooltipInfo);
-    if (updated) {
-      this.tooltipInfo = input;
-      if (this.shouldRemoveToolbar()) {
-        this.removeToolbar();
-      } else if (input && !this.toolbar) {
-        this.createToolbar(input);
-      }
-    }
-    let shouldMeasure = updated || update.geometryChanged;
-    let newConfig = update.state.facet(tooltipConfig);
-    if (newConfig.defaultPlacement != this.defaultPlacement) {
-      this.defaultPlacement = newConfig.defaultPlacement;
-      shouldMeasure = true;
-    }
-    if (shouldMeasure) this.maybeMeasure();
+    const settingsChanged = update.transactions.some((transaction) =>
+      transaction.effects.some((effect) => effect.is(refreshMiniToolbarEffect)));
+    if (this.shouldRemoveToolbar()) this.removeToolbar();
+    else if (input && (!this.toolbar || settingsChanged)) this.createToolbar(input);
+
+    const newConfig = update.state.facet(tooltipConfig);
+    const placementChanged = newConfig.defaultPlacement !== this.defaultPlacement;
+    this.defaultPlacement = newConfig.defaultPlacement;
+    if (updated || update.geometryChanged || settingsChanged || placementChanged) this.maybeMeasure();
   }
 
   destroy(): void {
@@ -163,9 +127,8 @@ class ViewPluginClass implements PluginValue {
     this.toolbar = null;
   }
 
-  cachedRefRect: ClientRectObject | null = null;
-  readFromDOM = (): void => {
-    if (this.embedded) return;
+  readFromDOM = (): ClientRectObject | null => {
+    if (this.embedded) return null;
     if (this.tooltipInfo) {
       let { start, end } = this.tooltipInfo;
       if (end && start === end) {
@@ -173,9 +136,7 @@ class ViewPluginClass implements PluginValue {
       }
       const startRect = this.view.coordsAtPos(start);
       let endRect = end ? this.view.coordsAtPos(end) : null;
-      // if start and end are not visually on the same line,
-      // endRect will be set to right boundary of contentDOM
-      // at the same visuall line
+      // Anchor multiline selections to the first visual line.
       if (startRect && endRect && startRect.top !== endRect.top) {
         const contentRect = this.view.contentDOM.getBoundingClientRect();
         endRect = {
@@ -185,47 +146,59 @@ class ViewPluginClass implements PluginValue {
           bottom: startRect.bottom,
         };
       }
-      const refRect = getRectFromPosCoords(startRect, endRect);
-      if (refRect) {
-        this.cachedRefRect = refRect;
-        void this.computePosition(refRect);
-      }
+      return getRectFromPosCoords(startRect, endRect);
     }
+    return null;
   };
 
   async computePosition(refRect: ClientRectObject): Promise<void> {
     if (this.embedded || !this.toolbar) return;
-    this.virtualEl.rect = refRect;
+    const request = ++this.positionRequest;
     const { padding } = this.view.state.facet(tooltipConfig);
     const toolbar = this.toolbar;
-    const { x, y } = await computePosition(this.virtualEl, toolbar.dom, {
-      placement: this.defaultPlacement,
-      middleware: [
-        offset({ mainAxis: 5 }),
-        flip({ padding, boundary: this.view.scrollDOM }),
-        shift({ padding, boundary: this.view.scrollDOM }),
-      ],
-    });
-    if (this.toolbar !== toolbar) return;
-    Object.assign(toolbar.dom.style, {
-      top: "0",
-      left: "0",
-      transform: `translate(${Math.round(x)}px,${Math.round(y)}px)`,
-    });
+    const reference = { getBoundingClientRect: () => refRect, contextElement: this.view.scrollDOM };
+    try {
+      const { x, y } = await computePosition(reference, toolbar.dom, {
+        placement: this.defaultPlacement,
+        middleware: [
+          offset({ mainAxis: 5 }),
+          flip({ padding, boundary: this.view.scrollDOM }),
+          shift({ padding, boundary: this.view.scrollDOM }),
+        ],
+      });
+      if (this.toolbar !== toolbar || request !== this.positionRequest) return;
+      Object.assign(toolbar.dom.style, {
+        top: "0", left: "0", visibility: "visible",
+        transform: `translate(${Math.round(x)}px,${Math.round(y)}px)`,
+      });
+    } catch (error) {
+      if (this.toolbar !== toolbar || request !== this.positionRequest) return;
+      this.removeToolbar();
+      console.warn("Better Editor could not position the mini toolbar.", error);
+    }
   }
 
-  maybeMeasure() {
-    if (this.embedded) return;
-    if (this.view.inView && this.toolbar)
-      this.view.requestMeasure({ read: this.readFromDOM });
-    if (this.inView != this.view.inView) {
-      this.inView = this.view.inView;
-    }
+  maybeMeasure(): void {
+    if (this.embedded || !this.view.inView || !this.toolbar) return;
+    this.view.requestMeasure({
+      key: this,
+      read: this.readFromDOM,
+      write: (rect) => {
+        if (rect) void this.computePosition(rect);
+        else if (this.toolbar) this.toolbar.dom.style.visibility = "hidden";
+      },
+    });
   }
 }
 
 const tooltipPlugin = ViewPlugin.fromClass(ViewPluginClass, {
   eventHandlers: {
+    keydown(event) {
+      if (event.key !== "Escape" || !this.toolbar) return false;
+      this.removeToolbar();
+      this.view.focus();
+      return true;
+    },
     scroll() {
       this.maybeMeasure();
     },
