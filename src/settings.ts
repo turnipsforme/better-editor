@@ -23,11 +23,15 @@ export interface BetterEditorSettings {
   tabBarControlsEnabled: boolean;
   linkedFileDeletionEnabled: boolean;
   manualEmptyLines: EmptyLineMode;
+  manualKeepTopHeadingGap: boolean;
+  manualTasksAtTop: boolean;
   manualMoveLinks: boolean;
   manualMoveTasks: boolean;
   manualMoveNotes: boolean;
   manualAddBullets: boolean;
   automaticEmptyLines: EmptyLineMode;
+  automaticKeepTopHeadingGap: boolean;
+  automaticTasksAtTop: boolean;
   automaticMoveLinks: boolean;
   automaticMoveTasks: boolean;
   automaticMoveNotes: boolean;
@@ -52,11 +56,15 @@ export const DEFAULT_SETTINGS: BetterEditorSettings = {
   tabBarControlsEnabled: true,
   linkedFileDeletionEnabled: true,
   manualEmptyLines: "remove",
+  manualKeepTopHeadingGap: true,
+  manualTasksAtTop: true,
   manualMoveLinks: true,
   manualMoveTasks: true,
   manualMoveNotes: true,
   manualAddBullets: true,
   automaticEmptyLines: "remove",
+  automaticKeepTopHeadingGap: true,
+  automaticTasksAtTop: true,
   automaticMoveLinks: true,
   automaticMoveTasks: true,
   automaticMoveNotes: true,
@@ -73,10 +81,12 @@ export const DEFAULT_SETTINGS: BetterEditorSettings = {
   miniToolbarColors: {},
 };
 
-export function organizerOptions(settings: BetterEditorSettings, automatic: boolean): OrganizeNoteOptions {
+export function organizerOptions(settings: BetterEditorSettings, automatic: boolean, dailyNote = false): OrganizeNoteOptions {
   const prefix = automatic ? "automatic" : "manual";
   return {
     emptyLines: settings[`${prefix}EmptyLines`],
+    keepTopHeadingGap: settings[`${prefix}KeepTopHeadingGap`],
+    tasksAtTop: !dailyNote && settings[`${prefix}TasksAtTop`],
     organizeWebsiteLinks: settings.websiteLinkFilingEnabled && settings[`${prefix}MoveLinks`],
     moveTasks: settings[`${prefix}MoveTasks`],
     moveNotes: settings[`${prefix}MoveNotes`],
@@ -336,12 +346,22 @@ export class BetterEditorSettingTab extends PluginSettingTab {
         },
       },
       {
+        name: "Keep blank line after top heading",
+        desc: "Keep an existing blank line between the first heading and its content, even when removing empty lines.",
+        control: { type: "toggle", key: `${prefix}KeepTopHeadingGap`, defaultValue: true, disabled },
+      },
+      {
         name: "Move website links to Links",
         desc: "File standalone website links under the Links list. Requires Website link filing below.",
         control: {
           type: "toggle", key: `${prefix}MoveLinks`, defaultValue: true,
           disabled: () => disabled() || !this.plugin.settings.websiteLinkFilingEnabled,
         },
+      },
+      {
+        name: "Group tasks at top of non-daily notes",
+        desc: "Gather top-level tasks and their children before the first heading, after any properties. On by default; takes priority over Move tasks to Tasks.",
+        control: { type: "toggle", key: `${prefix}TasksAtTop`, defaultValue: true, disabled },
       },
       {
         name: "Move tasks to Tasks",

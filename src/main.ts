@@ -187,7 +187,7 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
       this.addCommand({
         id: "organize-current-note",
         name: "Organize current note",
-        editorCallback: (editor) => this.organizeEditor(editor, true)
+        editorCallback: (editor, view) => this.organizeEditor(editor, true, view.file)
       });
     });
 
@@ -256,9 +256,9 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
     new Notice(`Moved ${result.movedCount} website link${result.movedCount === 1 ? "" : "s"}.`);
   }
 
-  private organizeEditor(editor: Editor, showNotice: boolean): void {
+  private organizeEditor(editor: Editor, showNotice: boolean, file?: TFile | null): void {
     const originalText = editor.getValue();
-    const result = organizeCurrentNote(originalText, organizerOptions(this.settings, !showNotice));
+    const result = organizeCurrentNote(originalText, organizerOptions(this.settings, !showNotice, file ? this.isDailyNote(file) : true));
     if (result.text === originalText) {
       if (showNotice) new Notice("Current note is already organized.");
       return;
@@ -307,14 +307,14 @@ export default class BetterEditorPlugin extends Plugin implements SettingsHost {
 
     const view = this.app.workspace.getActiveViewOfType(MarkdownView);
     if (view?.file?.path === file.path) {
-      this.organizeEditor(view.editor, false);
+      this.organizeEditor(view.editor, false, file);
       return;
     }
 
     await this.app.vault.process(file, (text) => {
       if (this.unloaded || !this.settings.noteOrganizerEnabled || !this.settings.organizeOnNoteOpen) return text;
       if (this.settings.organizeOnlyDailyNotes && !this.isDailyNote(file)) return text;
-      return organizeCurrentNote(text, organizerOptions(this.settings, true)).text;
+      return organizeCurrentNote(text, organizerOptions(this.settings, true, this.isDailyNote(file))).text;
     });
   }
 

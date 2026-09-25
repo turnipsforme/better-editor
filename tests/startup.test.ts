@@ -181,7 +181,7 @@ describe("plugin startup", () => {
   });
 });
 
-import { MarkdownView, TFile, type Editor } from "obsidian";
+import { MarkdownView, TFile, moment, type Editor } from "obsidian";
 import { BetterEditorSettingTab, DEFAULT_SETTINGS, organizerOptions } from "../src/settings";
 
 function textEditor(initial: string): Editor {
@@ -197,6 +197,48 @@ function textEditor(initial: string): Editor {
 }
 
 describe("organizer integration", () => {
+  it.each([false, true])("uses the note's daily status in every organizer path: %s", async (daily) => {
+    const { plugin, workspace } = createWorkspace();
+    Object.assign(plugin.app, { internalPlugins: { getPluginById: () => ({ enabled: true, instance: { options: { folder: "Journal", format: "YYYY-MM-DD" } } }) } });
+    vi.mocked(moment).mockReturnValue({ isValid: () => true } as ReturnType<typeof moment>);
+    await plugin.onload();
+    await plugin.updateSettings({ organizeOnNoteOpen: true });
+    const file = Object.assign(new TFile(), { path: daily ? "Journal/2026-09-25.md" : "Project.md", extension: "md" });
+    const input = "# Title\n\nSummary\n- [ ] Task\n## Tasks\n";
+    const expected = daily ? "# Title\n\n- Summary\n## Tasks\n- [ ] Task\n" : "- [ ] Task\n# Title\n\n- Summary\n## Tasks\n";
+    const editor = textEditor(input);
+    const view = Object.assign(Object.create(MarkdownView.prototype), { file, editor });
+    const command = vi.mocked(plugin.addCommand).mock.calls.map(([command]) => command).find((command) => command.id === "organize-current-note")!;
+    command.editorCallback!(editor, view);
+    expect(editor.getValue()).toBe(expected);
+
+    view.editor = textEditor(input);
+    const getActiveViewOfType = vi.fn(() => view as MarkdownView | null);
+    Object.assign(workspace, { getActiveViewOfType });
+    const fileOpen = workspace.on.mock.calls.find(([name]) => name === "file-open")![1] as unknown as (file: TFile) => void;
+    fileOpen(file);
+    expect(view.editor.getValue()).toBe(expected);
+
+    const process = vi.fn(async (_file: TFile, update: (text: string) => string) => update(input));
+    Object.assign(plugin.app, { vault: { process } });
+    getActiveViewOfType.mockReturnValue(null);
+    fileOpen(file);
+    expect(await process.mock.results[0].value).toBe(expected);
+    if (daily) expect(moment).toHaveBeenCalledWith("2026-09-25", "YYYY-MM-DD", true);
+    plugin.unload();
+  });
+
+  it("saves the new switches independently for manual and automatic use", async () => {
+    const { plugin } = createWorkspace();
+    await plugin.onload();
+    await plugin.updateSettings({ manualKeepTopHeadingGap: false, manualTasksAtTop: false });
+    expect(organizerOptions(plugin.settings, false)).toMatchObject({ keepTopHeadingGap: false, tasksAtTop: false });
+    expect(organizerOptions(plugin.settings, true)).toMatchObject({ keepTopHeadingGap: true, tasksAtTop: true });
+    expect(organizerOptions(plugin.settings, true, true)).toMatchObject({ tasksAtTop: false });
+    expect(plugin.saveData).toHaveBeenLastCalledWith(expect.objectContaining({ manualKeepTopHeadingGap: false, manualTasksAtTop: false }));
+    plugin.unload();
+  });
+
   it("adds defaults to old saved settings without changing existing choices", async () => {
     const { plugin } = createWorkspace();
     vi.mocked(plugin.loadData).mockResolvedValueOnce({ websiteLinkFilingEnabled: false, organizeOnNoteOpen: true });
@@ -204,7 +246,7 @@ describe("organizer integration", () => {
     expect(plugin.settings.manualEmptyLines).toBe("remove");
     expect(plugin.settings.automaticEmptyLines).toBe("remove");
     expect(organizerOptions(plugin.settings, false)).toEqual({
-      emptyLines: "remove", organizeWebsiteLinks: false, moveTasks: true, moveNotes: true, addBullets: true,
+      emptyLines: "remove", keepTopHeadingGap: true, tasksAtTop: true, organizeWebsiteLinks: false, moveTasks: true, moveNotes: true, addBullets: true,
     });
     plugin.unload();
   });
@@ -282,6 +324,9 @@ describe("organizer integration", () => {
       return typeof disabled === "function" ? disabled() : disabled;
     };
     expect(isDisabled("manualMoveNotes")).toBe(false);
+    expect(isDisabled("manualKeepTopHeadingGap")).toBe(false);
+    expect(isDisabled("manualTasksAtTop")).toBe(false);
+    expect(isDisabled("automaticTasksAtTop")).toBe(true);
     expect(isDisabled("automaticMoveNotes")).toBe(true);
     plugin.settings.organizeOnNoteOpen = true;
     expect(isDisabled("automaticMoveNotes")).toBe(false);
@@ -290,5 +335,7 @@ describe("organizer integration", () => {
     plugin.settings.noteOrganizerEnabled = false;
     expect(isDisabled("manualAddBullets")).toBe(true);
     expect(isDisabled("automaticEmptyLines")).toBe(true);
+    expect(isDisabled("manualKeepTopHeadingGap")).toBe(true);
+    expect(isDisabled("automaticTasksAtTop")).toBe(true);
   });
 });

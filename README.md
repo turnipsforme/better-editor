@@ -15,12 +15,16 @@ Better Editor brings a set of focused writing and workspace tools into one Obsid
 | Setting | Choices / behavior |
 | --- | --- |
 | Empty lines | Remove all, collapse repeated blank lines to one, or keep all |
+| Keep blank line after top heading | Keep one existing blank line after the first heading, even with Remove all selected; on by default |
 | Move website links to Links | File standalone website links under the Links list |
+| Group tasks at top of non-daily notes | Gather top-level tasks and their children before any heading, after YAML properties; on by default |
 | Move tasks to Tasks | Move top-level tasks and their children under the first Tasks or To-do heading |
 | Move free text to Notes | Move simple text lines and list items under the first Notes heading |
 | Add bullets to text | Add bullets whether text moves or stays in place |
 
-Existing behavior stays enabled by default. Turning off **Website link filing** disables link filing in both organizer modes as well as its standalone command. Task and note movement require an existing matching heading; those headings are not created automatically. Turning off movement does not turn off bullet formatting, which has its own switch.
+Turning off **Website link filing** disables link filing in both organizer modes as well as its standalone command. In non-daily notes, **Group tasks at top of non-daily notes** takes priority over **Move tasks to Tasks**, gathering tasks from all sections without creating a heading. Daily notes keep their existing task-filing behavior. Daily notes are identified using the enabled Daily notes core plugin's folder and date format.
+
+When grouping tasks at the top is off, task movement requires an existing Tasks or To-do heading. Note movement requires an existing Notes heading. Those headings are not created automatically. Turning off movement does not turn off bullet formatting, which has its own switch. Nested tasks stay with their parent items, and task blocks containing protected literal content stay in place.
 
 **Organize notes when opened** enables the automatic profile. **Only daily notes** limits it to the Daily notes core plugin's folder and date format. Feature switches appear beside their related settings, and disabled features keep their saved options.
 
@@ -77,7 +81,11 @@ Copy `main.js`, `manifest.json`, and `styles.css` into:
 
 Then reload Obsidian and enable **Better Editor**.
 
-## Latest release: 1.3.1
+## Latest release: 1.4.0
+
+Adds **Keep blank line after top heading** and **Group tasks at top of non-daily notes** to both manual and automatic organization settings. Both are on by default. Tasks in non-daily notes are gathered before any heading, after properties, while daily notes keep their existing task-filing behavior. The spacing option keeps an existing blank line after the first heading even when other empty lines are removed.
+
+### 1.3.1
 
 Fixes the Obsidian review findings by using its supported style helper for toolbar positioning and making the cut and copy button callbacks return synchronously. Clipboard actions still run asynchronously and keep their existing failure handling.
 

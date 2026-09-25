@@ -16,6 +16,8 @@ export type EmptyLineMode = "remove" | "collapse" | "keep";
 
 export interface OrganizeNoteOptions {
   emptyLines?: EmptyLineMode;
+  keepTopHeadingGap?: boolean;
+  tasksAtTop?: boolean;
   organizeWebsiteLinks?: boolean;
   moveTasks?: boolean;
   moveNotes?: boolean;
@@ -199,7 +201,7 @@ function headingType(line: string): OrganizeSectionType | null {
 }
 
 /** Protect literal blocks before any pass, including link filing. */
-function protectedLines(lines: string[]): boolean[] {
+function protectedLines(lines: string[], protectSetext = true): boolean[] {
   const protectedLine = lines.map(() => false);
   let frontmatter = lines[0] === "---";
   let fence: { marker: string; length: number } | null = null;
@@ -236,28 +238,48 @@ function protectedLines(lines: string[]): boolean[] {
       fence = { marker: open[1][0], length: open[1].length };
     }
     // A setext heading's text and underline must stay together.
-    if (index > 0 && /^ {0,3}(?:=+|-+)\s*$/.test(line) && lines[index - 1].trim()) {
+    if (protectSetext && index > 0 && /^ {0,3}(?:=+|-+)\s*$/.test(line) && lines[index - 1].trim()) {
       protectedLine[index - 1] = protectedLine[index] = true;
     }
   }
   return protectedLine;
 }
 
-function removeEmptyLines(lines: string[], mode: EmptyLineMode): { lines: string[]; removedCount: number } {
+function removeEmptyLines(lines: string[], mode: EmptyLineMode, keepTopHeadingGap = false): { lines: string[]; removedCount: number } {
   if (mode === "keep") return { lines, removedCount: 0 };
   const protectedLine = protectedLines(lines);
+  const topHeadingEnd = keepTopHeadingGap ? findTopHeadingEnd(lines) : -1;
   const compacted: string[] = [];
   let removedCount = 0;
   let previousEmpty = false;
 
   lines.forEach((line, index) => {
     const empty = !protectedLine[index] && line.trim() === "";
-    if (empty && (mode === "remove" || previousEmpty)) removedCount++;
+    const headingGap = topHeadingEnd >= 0 && index === topHeadingEnd + 1;
+    if (empty && !headingGap && (mode === "remove" || previousEmpty)) removedCount++;
     else compacted.push(line);
     previousEmpty = empty;
   });
 
   return { lines: compacted, removedCount };
+}
+
+function findTopHeadingEnd(lines: string[]): number {
+  const literalLine = protectedLines(lines, false);
+  for (let index = frontmatterEnd(lines); index < lines.length; index++) {
+    if (literalLine[index]) continue;
+    if (markdownHeading.test(lines[index])) return index;
+    if (lines[index].trim() && !literalLine[index + 1]
+      && /^ {0,3}(?:=+|-+)\s*$/.test(lines[index + 1] ?? "")) return index + 1;
+  }
+  return -1;
+}
+
+/** Keep YAML properties first, including an unfinished properties block. */
+function frontmatterEnd(lines: string[]): number {
+  if (lines[0] !== "---") return 0;
+  const end = lines.findIndex((line, index) => index > 0 && /^(?:---|\.\.\.)\s*$/.test(line));
+  return end < 0 ? lines.length : end + 1;
 }
 
 function findOrganizeSections(lines: string[], protectedLine: boolean[]): OrganizeSection[] {
@@ -378,7 +400,7 @@ export function organizeCurrentNote(
   const initialLines = linkResult.text.split(/\r?\n/);
   if (hadFinalEol) initialLines.pop();
 
-  const compacted = removeEmptyLines(initialLines, options.emptyLines ?? "remove");
+  const compacted = removeEmptyLines(initialLines, options.emptyLines ?? "remove", options.keepTopHeadingGap);
   const lines = compacted.lines;
   const protectedLine = protectedLines(lines);
   const organizeSections = findOrganizeSections(lines, protectedLine);
@@ -393,13 +415,13 @@ export function organizeCurrentNote(
 
   const taskIndexes = new Set<number>();
   const taskBlocks: TaskBlock[] = [];
-  if (options.moveTasks !== false && taskTarget) {
+  if (options.tasksAtTop || (options.moveTasks !== false && taskTarget)) {
     for (let index = 0; index < lines.length; index++) {
       const match = !protectedLine[index] ? lines[index].match(taskItem) : null;
       // A top-level task can be moved with all of its indented Markdown
       // children. Indented tasks may belong to a parent elsewhere, so retain
       // them in place rather than risking an orphaned subtree.
-      if (!match || match[1] !== "" || taskSectionLines[index] || linksSectionLines[index]) continue;
+      if (!match || match[1] !== "" || (!options.tasksAtTop && taskSectionLines[index]) || linksSectionLines[index]) continue;
 
       const end = taskBlockEnd(lines, index);
       const blockLines = lines.slice(index, end);
@@ -434,21 +456,26 @@ export function organizeCurrentNote(
   const remaining = lines.filter((_, index) => !taskIndexes.has(index) && !noteIndexes.has(index));
 
   if (taskBlocks.length > 0) {
-    const remainingProtected = protectedLines(remaining);
-    const remainingTaskTarget = findOrganizeSections(remaining, remainingProtected)
-      .find((section) => section.type === "tasks");
-    if (remainingTaskTarget) {
-      let insertAt = remainingTaskTarget.start + 1;
-      for (let index = remainingTaskTarget.end - 1; index > remainingTaskTarget.start; index--) {
-        const taskMatch = remaining[index].match(taskItem);
-        if (taskMatch && taskMatch[1] === "") {
-          insertAt = taskBlockEnd(remaining, index);
-          break;
+    const flattenedTasks = taskBlocks.flatMap((block) => block.lines);
+    if (options.tasksAtTop) {
+      remaining.splice(frontmatterEnd(remaining), 0, ...flattenedTasks);
+    } else {
+      const remainingProtected = protectedLines(remaining);
+      const remainingTaskTarget = findOrganizeSections(remaining, remainingProtected)
+        .find((section) => section.type === "tasks");
+      if (remainingTaskTarget) {
+        let insertAt = remainingTaskTarget.start + 1;
+        if (options.keepTopHeadingGap && remainingTaskTarget.start === findTopHeadingEnd(remaining)
+          && remaining[insertAt]?.trim() === "") insertAt++;
+        for (let index = remainingTaskTarget.end - 1; index > remainingTaskTarget.start; index--) {
+          const taskMatch = remaining[index].match(taskItem);
+          if (taskMatch && taskMatch[1] === "") {
+            insertAt = taskBlockEnd(remaining, index);
+            break;
+          }
         }
+        remaining.splice(insertAt, 0, ...flattenedTasks);
       }
-      const flattenedTasks: string[] = [];
-      for (const block of taskBlocks) for (const line of block.lines) flattenedTasks.push(line);
-      remaining.splice(insertAt, 0, ...flattenedTasks);
     }
   }
 
@@ -464,7 +491,7 @@ export function organizeCurrentNote(
 
   // Moving a line can join two previously separate runs of blank lines.
   const finalCompacted = options.emptyLines === "collapse"
-    ? removeEmptyLines(remaining, "collapse")
+    ? removeEmptyLines(remaining, "collapse", options.keepTopHeadingGap)
     : { lines: remaining, removedCount: 0 };
   return {
     text: joinLines(finalCompacted.lines, eol, hadFinalEol),

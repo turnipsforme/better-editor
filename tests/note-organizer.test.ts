@@ -239,6 +239,77 @@ const nothingEnabled = {
   addBullets: false,
 };
 
+describe("top heading spacing", () => {
+  it("keeps the gap when filing new tasks under the top heading", () => {
+    const input = "# Tasks\n\n# Notes\n- [ ] Task\n";
+    expect(organizeCurrentNote(input, { keepTopHeadingGap: true }).text)
+      .toBe("# Tasks\n\n- [ ] Task\n# Notes\n");
+  });
+
+  it.each(["# Title", "Title\n====="])("keeps one existing gap after %s", (heading) => {
+    const input = `---\ntitle: Example\n---\n${heading}\n\n\nText\n\n## Other\n\nMore\n`;
+    const options = { ...nothingEnabled, emptyLines: "remove" as const, keepTopHeadingGap: true };
+    const result = organizeCurrentNote(input, options);
+    expect(result.text).toBe(`---\ntitle: Example\n---\n${heading}\n\nText\n## Other\nMore\n`);
+    expect(result.removedEmptyLineCount).toBe(3);
+    expect(organizeCurrentNote(result.text, options).text).toBe(result.text);
+  });
+
+  it("can be disabled and does not insert a missing blank line", () => {
+    const options = { ...nothingEnabled, emptyLines: "remove" as const };
+    expect(organizeCurrentNote("# Title\n\nText", { ...options, keepTopHeadingGap: false }).text).toBe("# Title\nText");
+    expect(organizeCurrentNote("# Title\nText", { ...options, keepTopHeadingGap: true }).text).toBe("# Title\nText");
+    expect(organizeCurrentNote("\nText", { ...options, keepTopHeadingGap: true }).text).toBe("Text");
+  });
+
+  it("ignores headings inside literal blocks and keeps CRLF", () => {
+    const input = "```md\r\n# Example\r\n\r\n```\r\n# Title\r\n\r\nText\r\n\r\nMore\r\n";
+    expect(organizeCurrentNote(input, { ...nothingEnabled, emptyLines: "remove", keepTopHeadingGap: true }).text)
+      .toBe("```md\r\n# Example\r\n\r\n```\r\n# Title\r\n\r\nText\r\nMore\r\n");
+  });
+});
+
+describe("tasks at the top", () => {
+  const options = { ...nothingEnabled, tasksAtTop: true };
+
+  it("gathers tasks from every section before headings and after properties", () => {
+    const input = "---\ntitle: Project\n---\n# Project\n\nSummary\n## Tasks\n- [ ] First\n  Detail\n  - [ ] Child\n## Notes\n- [x] Second\nLast note\n";
+    const result = organizeCurrentNote(input, options);
+    expect(result.text).toBe("---\ntitle: Project\n---\n- [ ] First\n  Detail\n  - [ ] Child\n- [x] Second\n# Project\n\nSummary\n## Tasks\n## Notes\nLast note\n");
+    expect(result.movedTaskCount).toBe(2);
+    expect(organizeCurrentNote(result.text, options).text).toBe(result.text);
+  });
+
+  it("works without headings and saves newline style", () => {
+    const input = "Intro\r\n1. [ ] First\r\nMore\r\n* [X] Second\r\n";
+    expect(organizeCurrentNote(input, options).text).toBe("1. [ ] First\r\n* [X] Second\r\nIntro\r\nMore\r\n");
+    expect(organizeCurrentNote("Intro\n- [ ] Task", options).text).toBe("- [ ] Task\nIntro");
+  });
+
+  it("leaves nested and literal tasks attached to their context", () => {
+    const input = "# Project\n- Parent\n  - [ ] Nested\n> - [ ] Quote\n```md\n- [ ] Code\n```\n<!--\n- [ ] Comment\n-->\n$$\n- [ ] Math\n$$\n- [ ] With code\n  ```\n  literal\n  ```\n- [ ] Movable";
+    expect(organizeCurrentNote(input, options).text).toBe(`- [ ] Movable\n${input.replace("\n- [ ] Movable", "")}`);
+    const unfinished = "---\ntitle: Unfinished\n- [ ] YAML";
+    expect(organizeCurrentNote(unfinished, options).text).toBe(unfinished);
+  });
+
+  it("falls back to heading filing when switched off", () => {
+    const input = "# Project\n- [ ] Task\n## Tasks\n";
+    expect(organizeCurrentNote(input, { ...options, tasksAtTop: false, moveTasks: true }).text)
+      .toBe("# Project\n## Tasks\n- [ ] Task\n");
+    expect(organizeCurrentNote(input, { ...options, tasksAtTop: false }).text).toBe(input);
+  });
+
+  it.each(["remove", "collapse", "keep"] as const)("works with link and note filing using %s gaps", (emptyLines) => {
+    const input = "# Project\n\nSummary\n\n- [ ] Task\n\n## Notes\n\nhttps://example.test\n";
+    const profile = { tasksAtTop: true, keepTopHeadingGap: true, emptyLines };
+    const result = organizeCurrentNote(input, profile);
+    expect(result.text.startsWith("- [ ] Task\n# Project\n\n")).toBe(true);
+    expect(result.text).toContain("- [[Links]]\n  - [](https://example.test)");
+    expect(organizeCurrentNote(result.text, profile).text).toBe(result.text);
+  });
+});
+
 describe("organizer options", () => {
   const input = "# Inbox\nLoose note\n\n\n- [ ] Task\nhttps://example.test\n# Tasks\n# Notes\n";
 
