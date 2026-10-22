@@ -1,4 +1,6 @@
 import {
+  ButtonComponent,
+  Modal,
   Notice,
   TFile,
   parseLinktext,
@@ -66,14 +68,74 @@ function uniqueReferenceCount(references: PositionedLinkReference[]): number {
   ))).size;
 }
 
+export type DeletionConfirmation = (
+  app: App,
+  target: TFile,
+  mentionCount: number,
+  action: LinkedMentionAction
+) => Promise<boolean>;
+
+class DeleteFileModal extends Modal {
+  private confirmed = false;
+
+  constructor(
+    app: App,
+    private readonly target: TFile,
+    private readonly mentionCount: number,
+    private readonly action: LinkedMentionAction,
+    private readonly resolve: (confirmed: boolean) => void
+  ) {
+    super(app);
+  }
+
+  onOpen(): void {
+    this.setTitle("Delete file");
+    this.contentEl.createEl("p", {
+      cls: "u-break-word",
+      text: `Are you sure you want to delete "${this.target.name}"?`
+    });
+    if (this.mentionCount > 0) {
+      const result = this.action === "remove" ? "removed" : "changed to plain text";
+      this.contentEl.createEl("p", {
+        text: `${this.mentionCount} linked mention${this.mentionCount === 1 ? "" : "s"} in other notes will be ${result}.`
+      });
+    }
+
+    const buttons = this.contentEl.createDiv({ cls: "modal-button-container" });
+    const deleteButton = new ButtonComponent(buttons)
+      .setButtonText("Delete")
+      .setWarning()
+      .onClick(() => {
+        this.confirmed = true;
+        this.close();
+      });
+    new ButtonComponent(buttons)
+      .setButtonText("Cancel")
+      .onClick(() => this.close());
+    deleteButton.buttonEl.focus();
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+    this.resolve(this.confirmed);
+  }
+}
+
+// Obsidian's promptForDeletion trashes the file itself once confirmed, which would
+// remove it before its linked mentions could be located, so ask with a plain modal.
+export const confirmDeletion: DeletionConfirmation = (app, target, mentionCount, action) => (
+  new Promise((resolve) => new DeleteFileModal(app, target, mentionCount, action, resolve).open())
+);
+
 export class CurrentFileDeletion {
   constructor(
     private readonly app: App,
-    private readonly getAction: () => LinkedMentionAction
+    private readonly getAction: () => LinkedMentionAction,
+    private readonly confirm: DeletionConfirmation = confirmDeletion
   ) {}
 
   async run(target: TFile): Promise<void> {
-    const confirmed = await this.app.fileManager.promptForDeletion(target);
+    const confirmed = await this.confirm(this.app, target, this.linkedMentionCount(target), this.getAction());
     if (!confirmed) return;
 
     let staged: StagedRewrite[] = [];
@@ -99,6 +161,15 @@ export class CurrentFileDeletion {
       const message = error instanceof Error ? error.message : "Unknown error";
       new Notice(`Could not delete ${target.name}: ${message}`);
     }
+  }
+
+  private linkedMentionCount(target: TFile): number {
+    let count = 0;
+    for (const source of this.app.vault.getMarkdownFiles()) {
+      if (source.path === target.path) continue;
+      count += this.app.metadataCache.resolvedLinks[source.path]?.[target.path] ?? 0;
+    }
+    return count;
   }
 
   private async stageLinkedMentionChanges(target: TFile): Promise<StagedRewrite[]> {

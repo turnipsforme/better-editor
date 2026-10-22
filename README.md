@@ -56,7 +56,7 @@ The desktop-only **Better Editor: Hide/show tab bar** command hides or shows the
 
 ### Linked file deletion
 
-**Better Editor: Delete current file and clean linked mentions** uses Obsidian's normal deletion confirmation and configured trash location. Before deleting the file, it updates links to that file in other Markdown notes. In settings, choose either:
+**Better Editor: Delete current file and clean linked mentions** asks for confirmation, telling you how many linked mentions will change, and then moves the file to your configured trash location. Before deleting the file, it updates links to that file in other Markdown notes. In settings, choose either:
 
 - **Keep their display text** to turn wiki links and Markdown links into unlinked text
 - **Remove them completely** to remove only the matching link tokens
@@ -81,7 +81,11 @@ Copy `main.js`, `manifest.json`, and `styles.css` into:
 
 Then reload Obsidian and enable **Better Editor**.
 
-## Latest release: 1.4.0
+## Latest release: 1.5.0
+
+Fixes **Delete current file and clean linked mentions**. The command deleted the note before cleaning up links, so links in other notes stayed in place and an error appeared. It now asks for confirmation in its own dialog, updates every linked mention first, and only then moves the file to the trash. Because it no longer uses Obsidian's built-in deletion prompt, the command always asks for confirmation and doesn't offer to delete unlinked attachments.
+
+### 1.4.0
 
 Adds **Keep blank line after top heading** and **Group tasks at top of non-daily notes** to both manual and automatic organization settings. Both are on by default. Tasks in non-daily notes are gathered before any heading, after properties, while daily notes keep their existing task-filing behavior. The spacing option keeps an existing blank line after the first heading even when other empty lines are removed.
 

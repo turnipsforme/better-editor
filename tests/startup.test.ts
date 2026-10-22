@@ -25,6 +25,8 @@ vi.mock("obsidian", () => ({
     }
   },
   PluginSettingTab: class {},
+  ButtonComponent: class {},
+  Modal: class {},
   Platform: { isDesktopApp: true },
   MarkdownView: class {},
   TFile: class {},
