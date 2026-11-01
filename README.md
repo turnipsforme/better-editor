@@ -1,6 +1,10 @@
 # Better Editor
 
-Better Editor brings a set of focused writing and workspace tools into one Obsidian plugin. Every feature has its own switch in **Settings → Better Editor**. Turning a feature off also removes its commands and stops its automatic behavior.
+Better Editor puts writing and workspace tools in one Obsidian plugin. Each feature has its own switch in **Settings → Better Editor**, and turning one off also removes its commands and automatic behavior.
+
+![Mini toolbar over selected text in a sample note](assets/better-editor.png)
+
+*Mockup with sample data.*
 
 ## Features
 

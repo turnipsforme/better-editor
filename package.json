@@ -1,7 +1,7 @@
 {
   "name": "better-editor",
   "version": "1.5.0",
-  "description": "Improve editing with focused writing and workspace tools for Obsidian.",
+  "description": "Organize notes, format selections, and clean up links when you delete a file.",
   "private": true,
   "author": "Wren",
   "license": "MIT",

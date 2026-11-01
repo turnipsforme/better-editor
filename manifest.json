@@ -3,7 +3,7 @@
   "name": "Better Editor",
   "version": "1.5.0",
   "minAppVersion": "1.13.1",
-  "description": "Improve editing with tools for organizing notes, formatting selections, managing tasks and tabs, and safely deleting linked files.",
+  "description": "Organize notes, format selections, and clean up links when you delete a file.",
   "author": "Wren",
   "authorUrl": "https://github.com/turnipsforme",
   "isDesktopOnly": false
