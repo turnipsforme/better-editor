@@ -2,7 +2,7 @@
 
 Better Editor puts writing and workspace tools in one Obsidian plugin. Each feature has its own switch in **Settings → Better Editor**, and turning one off also removes its commands and automatic behavior.
 
-![Mini toolbar over selected text in a sample note](assets/better-editor.png)
+![Mini toolbar over selected text in a sample note](assets/better-editor.gif)
 
 *Mockup with sample data.*
 
